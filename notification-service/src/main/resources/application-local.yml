@@ -1,0 +1,17 @@
+spring:
+  datasource:
+    url: jdbc:postgresql://${NOTIFICATION_DB_HOST:localhost}:${NOTIFICATION_DB_PORT:5432}/${NOTIFICATION_DB_NAME:orderflow_notification}
+    username: ${POSTGRES_USER:orderflow}
+    password: ${POSTGRES_PASSWORD:orderflow}
+  jpa:
+    open-in-view: false
+    hibernate:
+      ddl-auto: validate
+  flyway:
+    enabled: true
+
+  rabbitmq:
+    host: ${RABBITMQ_HOST:localhost}
+    port: ${RABBITMQ_PORT:5672}
+    username: ${RABBITMQ_USERNAME:orderflow}
+    password: ${RABBITMQ_PASSWORD:orderflow}

@@ -1,0 +1,74 @@
+# =========================
+# Java / Maven
+# =========================
+target/
+*.class
+*.jar
+*.war
+*.ear
+
+# Maven wrapper cache / logs
+.mvn/timing.properties
+mvnw.log
+
+# =========================
+# Environment / Secrets
+# =========================
+.env
+.env.*
+!.env.example
+
+# =========================
+# IntelliJ IDEA
+# =========================
+.idea/
+*.iml
+*.iws
+*.ipr
+out/
+
+# =========================
+# VS Code
+# =========================
+.vscode/
+
+# =========================
+# Eclipse
+# =========================
+.classpath
+.project
+.settings/
+
+# =========================
+# Logs
+# =========================
+*.log
+logs/
+
+# =========================
+# OS files
+# =========================
+.DS_Store
+Thumbs.db
+
+# =========================
+# Test / Coverage
+# =========================
+coverage/
+*.exec
+**/surefire-reports/
+**/failsafe-reports/
+
+# =========================
+# Temporary files
+# =========================
+*.tmp
+*.temp
+*.swp
+*.swo
+
+# =========================
+# Other files
+# =========================
+docs
+README.md

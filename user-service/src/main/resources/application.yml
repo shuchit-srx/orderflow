@@ -1,0 +1,22 @@
+spring:
+  application:
+    name: user-service
+  profiles:
+    default: local
+
+server:
+  port: ${SERVER_PORT:8081}
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+  endpoint:
+    health:
+      show-details: when_authorized
+
+info:
+  app:
+    name: user-service
+    version: 0.0.1-SNAPSHOT

@@ -1,0 +1,22 @@
+spring:
+  application:
+    name: order-service
+  profiles:
+    default: local
+
+server:
+  port: ${SERVER_PORT:8083}
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+  endpoint:
+    health:
+      show-details: when_authorized
+
+info:
+  app:
+    name: order-service
+    version: 0.0.1-SNAPSHOT

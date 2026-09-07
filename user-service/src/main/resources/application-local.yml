@@ -1,0 +1,12 @@
+spring:
+  datasource:
+    url: jdbc:postgresql://${USER_DB_HOST:localhost}:${USER_DB_PORT:5432}/${USER_DB_NAME:orderflow_user}
+    username: ${POSTGRES_USER:orderflow}
+    password: ${POSTGRES_PASSWORD:orderflow}
+  jpa:
+    open-in-view: false
+    hibernate:
+      ddl-auto: validate
+  flyway:
+    enabled: true
+

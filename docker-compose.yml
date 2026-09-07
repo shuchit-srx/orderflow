@@ -1,0 +1,53 @@
+services:
+  postgres:
+    image: postgres:17-alpine
+    container_name: orderflow-postgres
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-orderflow}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-orderflow}
+      POSTGRES_DB: postgres
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    volumes:
+      - orderflow-postgres-data:/var/lib/postgresql/data
+      - ./infrastructure/docker/postgres/init:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-orderflow} -d postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  redis:
+    image: redis:8-alpine
+    container_name: orderflow-redis
+    ports:
+      - "${REDIS_PORT:-6379}:6379"
+    volumes:
+      - orderflow-redis-data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  rabbitmq:
+    image: rabbitmq:4-management-alpine
+    container_name: orderflow-rabbitmq
+    environment:
+      RABBITMQ_DEFAULT_USER: ${RABBITMQ_USERNAME:-orderflow}
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASSWORD:-orderflow}
+    ports:
+      - "${RABBITMQ_PORT:-5672}:5672"
+      - "${RABBITMQ_MANAGEMENT_PORT:-15672}:15672"
+    volumes:
+      - orderflow-rabbitmq-data:/var/lib/rabbitmq
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+volumes:
+  orderflow-postgres-data:
+  orderflow-redis-data:
+  orderflow-rabbitmq-data:

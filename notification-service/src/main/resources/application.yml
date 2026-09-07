@@ -1,0 +1,22 @@
+spring:
+  application:
+    name: notification-service
+  profiles:
+    default: local
+
+server:
+  port: ${SERVER_PORT:8084}
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+  endpoint:
+    health:
+      show-details: when_authorized
+
+info:
+  app:
+    name: notification-service
+    version: 0.0.1-SNAPSHOT

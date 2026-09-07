@@ -1,0 +1,16 @@
+spring:
+  datasource:
+    url: jdbc:postgresql://${INVENTORY_DB_HOST:localhost}:${INVENTORY_DB_PORT:5432}/${INVENTORY_DB_NAME:orderflow_inventory}
+    username: ${POSTGRES_USER:orderflow}
+    password: ${POSTGRES_PASSWORD:orderflow}
+  jpa:
+    open-in-view: false
+    hibernate:
+      ddl-auto: validate
+  flyway:
+    enabled: true
+
+  data:
+    redis:
+      host: ${REDIS_HOST:localhost}
+      port: ${REDIS_PORT:6379}
