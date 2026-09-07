@@ -1,5 +1,8 @@
 package com.orderflow.user.config;
 
+import com.orderflow.user.config.security.RestAccessDeniedHandler;
+import com.orderflow.user.config.security.RestAuthenticationEntryPoint;
+
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
@@ -25,7 +28,9 @@ public class SecurityConfig {
     @Bean
     public SecurityFilterChain securityFilterChain(
             HttpSecurity http,
-            JwtAuthenticationConverter jwtAuthenticationConverter
+            JwtAuthenticationConverter jwtAuthenticationConverter,
+            RestAuthenticationEntryPoint authenticationEntryPoint,
+            RestAccessDeniedHandler accessDeniedHandler
     ) {
 
         http
@@ -39,9 +44,6 @@ public class SecurityConfig {
 
                 .authorizeHttpRequests(auth -> auth
 
-                        /*
-                         * Public endpoints
-                         */
                         .requestMatchers(
                                 "/api/v1/auth/register",
                                 "/api/v1/auth/login",
@@ -49,18 +51,9 @@ public class SecurityConfig {
                         )
                         .permitAll()
 
-                        /*
-                         * ADMIN-only APIs
-                         */
                         .requestMatchers("/api/v1/admin/**")
                         .hasRole("ADMIN")
 
-                        /*
-                         * Regular authenticated APIs.
-                         *
-                         * ADMIN is also allowed because admins
-                         * are legitimate authenticated users.
-                         */
                         .requestMatchers("/api/v1/**")
                         .hasAnyRole(
                                 "CUSTOMER",
@@ -71,12 +64,29 @@ public class SecurityConfig {
                         .authenticated()
                 )
 
-                .oauth2ResourceServer(oauth2 ->
-                        oauth2.jwt(jwt ->
-                                jwt.jwtAuthenticationConverter(
-                                        jwtAuthenticationConverter
+                .exceptionHandling(exceptions ->
+                        exceptions
+                                .authenticationEntryPoint(
+                                        authenticationEntryPoint
                                 )
-                        )
+                                .accessDeniedHandler(
+                                        accessDeniedHandler
+                                )
+                )
+
+                .oauth2ResourceServer(oauth2 ->
+                        oauth2
+                                .authenticationEntryPoint(
+                                        authenticationEntryPoint
+                                )
+                                .accessDeniedHandler(
+                                        accessDeniedHandler
+                                )
+                                .jwt(jwt ->
+                                        jwt.jwtAuthenticationConverter(
+                                                jwtAuthenticationConverter
+                                        )
+                                )
                 );
 
         return http.build();
