@@ -3,13 +3,14 @@ package com.orderflow.user.config;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
-import org.springframework.security.config.Customizer;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configurers.AbstractHttpConfigurer;
 import org.springframework.security.config.http.SessionCreationPolicy;
 
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
+
+import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationConverter;
 
 import org.springframework.security.web.SecurityFilterChain;
 
@@ -23,7 +24,8 @@ public class SecurityConfig {
 
     @Bean
     public SecurityFilterChain securityFilterChain(
-            HttpSecurity http
+            HttpSecurity http,
+            JwtAuthenticationConverter jwtAuthenticationConverter
     ) {
 
         http
@@ -36,6 +38,10 @@ public class SecurityConfig {
                 )
 
                 .authorizeHttpRequests(auth -> auth
+
+                        /*
+                         * Public endpoints
+                         */
                         .requestMatchers(
                                 "/api/v1/auth/register",
                                 "/api/v1/auth/login",
@@ -43,13 +49,33 @@ public class SecurityConfig {
                         )
                         .permitAll()
 
+                        /*
+                         * ADMIN-only APIs
+                         */
+                        .requestMatchers("/api/v1/admin/**")
+                        .hasRole("ADMIN")
+
+                        /*
+                         * Regular authenticated APIs.
+                         *
+                         * ADMIN is also allowed because admins
+                         * are legitimate authenticated users.
+                         */
+                        .requestMatchers("/api/v1/**")
+                        .hasAnyRole(
+                                "CUSTOMER",
+                                "ADMIN"
+                        )
+
                         .anyRequest()
                         .authenticated()
                 )
 
                 .oauth2ResourceServer(oauth2 ->
-                        oauth2.jwt(
-                                Customizer.withDefaults()
+                        oauth2.jwt(jwt ->
+                                jwt.jwtAuthenticationConverter(
+                                        jwtAuthenticationConverter
+                                )
                         )
                 );
 
