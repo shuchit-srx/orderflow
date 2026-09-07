@@ -6,7 +6,7 @@ import jakarta.validation.constraints.Size;
 
 import java.util.Locale;
 
-public record RegisterRequest(
+public record LoginRequest(
 
         @NotBlank(message = "Email is required")
         @Email(message = "Email must be valid")
@@ -14,32 +14,15 @@ public record RegisterRequest(
         String email,
 
         @NotBlank(message = "Password is required")
-        @Size(
-                min = 8,
-                max = 72,
-                message = "Password must be between 8 and 72 characters"
-        )
-        String password,
-
-        @NotBlank(message = "Display name is required")
-        @Size(
-                min = 2,
-                max = 120,
-                message = "Display name must be between 2 and 120 characters"
-        )
-        String displayName
+        String password
 
 ) {
 
-        public RegisterRequest {
+        public LoginRequest {
                 if (email != null) {
                         email = email
                                 .trim()
                                 .toLowerCase(Locale.ROOT);
-                }
-
-                if (displayName != null) {
-                        displayName = displayName.trim();
                 }
         }
 }
