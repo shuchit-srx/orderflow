@@ -2,6 +2,7 @@ package com.orderflow.user.service;
 
 import com.orderflow.user.domain.User;
 import com.orderflow.user.domain.UserStatus;
+import com.orderflow.user.dto.user.UpdateUserRequest;
 import com.orderflow.user.dto.user.UserResponse;
 import com.orderflow.user.exception.AccountDisabledException;
 import com.orderflow.user.exception.UserNotFoundException;
@@ -24,6 +25,26 @@ public class UserService {
     @Transactional(readOnly = true)
     public UserResponse getCurrentUser(UUID userId) {
 
+        User user = getActiveUser(userId);
+
+        return UserResponse.from(user);
+    }
+
+    @Transactional
+    public UserResponse updateCurrentUser(
+            UUID userId,
+            UpdateUserRequest request
+    ) {
+
+        User user = getActiveUser(userId);
+
+        user.updateDisplayName(request.displayName());
+
+        return UserResponse.from(user);
+    }
+
+    private User getActiveUser(UUID userId) {
+
         User user = userRepository
                 .findById(userId)
                 .orElseThrow(UserNotFoundException::new);
@@ -32,6 +53,6 @@ public class UserService {
             throw new AccountDisabledException();
         }
 
-        return UserResponse.from(user);
+        return user;
     }
 }
