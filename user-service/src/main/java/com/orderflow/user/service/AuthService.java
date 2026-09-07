@@ -14,6 +14,7 @@ import com.orderflow.user.repository.UserRepository;
 
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -24,13 +25,16 @@ public class AuthService {
 
     private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
+    private final JwtService jwtService;
 
     public AuthService(
             UserRepository userRepository,
-            PasswordEncoder passwordEncoder
+            PasswordEncoder passwordEncoder,
+            JwtService jwtService
     ) {
         this.userRepository = userRepository;
         this.passwordEncoder = passwordEncoder;
+        this.jwtService = jwtService;
     }
 
     @Transactional
@@ -54,13 +58,17 @@ public class AuthService {
         );
 
         try {
-
             User savedUser = userRepository.save(user);
 
             return RegisterResponse.from(savedUser);
 
         } catch (DataIntegrityViolationException exception) {
 
+            /*
+             * The database UNIQUE constraint is the final
+             * protection against two concurrent registrations
+             * using the same email.
+             */
             throw new EmailAlreadyExistsException(email);
         }
     }
@@ -88,7 +96,18 @@ public class AuthService {
             throw new InvalidCredentialsException();
         }
 
-        return LoginResponse.from(user);
+        Jwt jwt =
+                jwtService.generateAccessToken(user);
+
+        long expiresIn =
+                jwt.getExpiresAt().getEpochSecond()
+                        - jwt.getIssuedAt().getEpochSecond();
+
+        return new LoginResponse(
+                jwt.getTokenValue(),
+                "Bearer",
+                expiresIn
+        );
     }
 
     private String normalizeEmail(String email) {

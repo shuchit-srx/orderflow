@@ -20,3 +20,10 @@ info:
   app:
     name: user-service
     version: 0.0.1-SNAPSHOT
+
+security:
+  jwt:
+    issuer: orderflow-user-service
+    access-token-ttl-seconds: 3600
+    private-key-location: file:./keys/private.pem
+    public-key-location: file:./keys/public.pem

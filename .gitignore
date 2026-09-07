@@ -67,6 +67,9 @@ coverage/
 *.swp
 *.swo
 
+# JWT private signing key
+user-service/keys/private.pem
+
 # =========================
 # Other files
 # =========================
