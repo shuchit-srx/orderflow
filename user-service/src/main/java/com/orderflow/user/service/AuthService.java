@@ -18,7 +18,9 @@ import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.Instant;
 import java.util.Locale;
+import java.util.Objects;
 
 @Service
 public class AuthService {
@@ -63,11 +65,9 @@ public class AuthService {
             return RegisterResponse.from(savedUser);
 
         } catch (DataIntegrityViolationException exception) {
-
             /*
-             * The database UNIQUE constraint is the final
-             * protection against two concurrent registrations
-             * using the same email.
+             * PostgreSQL's UNIQUE(email) constraint is the
+             * final protection against concurrent registrations.
              */
             throw new EmailAlreadyExistsException(email);
         }
@@ -86,22 +86,28 @@ public class AuthService {
             throw new AccountDisabledException();
         }
 
-        boolean passwordMatches =
-                passwordEncoder.matches(
-                        request.password(),
-                        user.getPasswordHash()
-                );
-
-        if (!passwordMatches) {
+        if (!passwordEncoder.matches(
+                request.password(),
+                user.getPasswordHash()
+        )) {
             throw new InvalidCredentialsException();
         }
 
-        Jwt jwt =
-                jwtService.generateAccessToken(user);
+        Jwt jwt = jwtService.generateAccessToken(user);
+
+        Instant issuedAt = Objects.requireNonNull(
+                jwt.getIssuedAt(),
+                "JWT issuedAt must not be null"
+        );
+
+        Instant expiresAt = Objects.requireNonNull(
+                jwt.getExpiresAt(),
+                "JWT expiresAt must not be null"
+        );
 
         long expiresIn =
-                jwt.getExpiresAt().getEpochSecond()
-                        - jwt.getIssuedAt().getEpochSecond();
+                expiresAt.getEpochSecond()
+                        - issuedAt.getEpochSecond();
 
         return new LoginResponse(
                 jwt.getTokenValue(),
