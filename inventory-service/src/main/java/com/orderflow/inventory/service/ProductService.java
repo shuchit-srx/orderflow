@@ -59,8 +59,9 @@ public class ProductService {
                 Math.max(page, 0);
 
         int safeSize =
-                Math.min(
-                        Math.max(size, 1),
+                Math.clamp(
+                        size,
+                        1,
                         MAX_PAGE_SIZE
                 );
 
