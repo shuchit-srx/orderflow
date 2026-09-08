@@ -3,6 +3,16 @@ spring:
     name: inventory-service
   profiles:
     default: local
+  datasource:
+    url: jdbc:postgresql://${INVENTORY_DB_HOST:localhost}:${INVENTORY_DB_PORT:5432}/${INVENTORY_DB_NAME:orderflow_inventory}
+    username: ${POSTGRES_USER:orderflow}
+    password: ${POSTGRES_PASSWORD:orderflow}
+  jpa:
+    hibernate:
+      ddl-auto: validate
+
+  flyway:
+    enabled: true
 
 server:
   port: ${SERVER_PORT:8082}
