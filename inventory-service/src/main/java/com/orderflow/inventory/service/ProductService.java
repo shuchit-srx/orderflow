@@ -5,6 +5,16 @@ import com.orderflow.inventory.dto.product.ProductPageResponse;
 import com.orderflow.inventory.dto.product.ProductResponse;
 import com.orderflow.inventory.exception.ProductNotFoundException;
 import com.orderflow.inventory.repository.ProductRepository;
+import com.orderflow.inventory.domain.Inventory;
+
+import com.orderflow.inventory.dto.product.CreateProductRequest;
+import com.orderflow.inventory.dto.product.UpdateProductRequest;
+
+import com.orderflow.inventory.exception.SkuAlreadyExistsException;
+
+import com.orderflow.inventory.repository.InventoryRepository;
+
+import org.springframework.dao.DataIntegrityViolationException;
 
 import jakarta.persistence.criteria.Predicate;
 
@@ -36,12 +46,77 @@ public class ProductService {
             );
 
     private final ProductRepository productRepository;
+    private final InventoryRepository inventoryRepository;
 
     public ProductService(
-            ProductRepository productRepository
+            ProductRepository productRepository,
+            InventoryRepository inventoryRepository
     ) {
         this.productRepository =
                 productRepository;
+
+        this.inventoryRepository =
+                inventoryRepository;
+    }
+
+    @Transactional
+    public ProductResponse createProduct(
+            CreateProductRequest request
+    ) {
+
+        if (productRepository.existsBySku(
+                request.sku()
+        )) {
+
+            throw new SkuAlreadyExistsException(
+                    request.sku()
+            );
+        }
+
+        Product product =
+                new Product(
+                        request.sku(),
+                        request.name(),
+                        request.description(),
+                        request.price()
+                );
+
+        Product savedProduct;
+
+        try {
+
+            /*
+             * Flush here so a concurrent duplicate
+             * SKU violation happens inside this method.
+             */
+            savedProduct =
+                    productRepository
+                            .saveAndFlush(
+                                    product
+                            );
+
+        } catch (DataIntegrityViolationException exception) {
+
+            throw new SkuAlreadyExistsException(
+                    request.sku()
+            );
+        }
+
+        /*
+         * Every product starts with zero inventory.
+         */
+        Inventory inventory =
+                new Inventory(
+                        savedProduct.getId()
+                );
+
+        inventoryRepository.save(
+                inventory
+        );
+
+        return ProductResponse.from(
+                savedProduct
+        );
     }
 
     @Transactional(readOnly = true)
@@ -132,6 +207,81 @@ public class ProductService {
                         );
 
         return ProductResponse.from(
+                product
+        );
+    }
+
+    @Transactional
+    public ProductResponse updateProduct(
+            UUID productId,
+            UpdateProductRequest request
+    ) {
+
+        Product product =
+                productRepository
+                        .findById(productId)
+                        .orElseThrow(() ->
+                                new ProductNotFoundException(
+                                        productId
+                                )
+                        );
+
+        /*
+         * Logically deleted products aren't
+         * editable in V1.
+         */
+        if (!product.isActive()) {
+
+            throw new ProductNotFoundException(
+                    productId
+            );
+        }
+
+        product.updateDetails(
+                request.name(),
+                request.description(),
+                request.price()
+        );
+
+        /*
+         * Explicit save isn't technically necessary
+         * because this is a managed JPA entity,
+         * but we'll keep repository semantics clear.
+         */
+        Product updated =
+                productRepository.save(
+                        product
+                );
+
+        return ProductResponse.from(
+                updated
+        );
+    }
+
+    @Transactional
+    public void deactivateProduct(
+            UUID productId
+    ) {
+
+        Product product =
+                productRepository
+                        .findById(productId)
+                        .orElseThrow(() ->
+                                new ProductNotFoundException(
+                                        productId
+                                )
+                        );
+
+        if (!product.isActive()) {
+
+            throw new ProductNotFoundException(
+                    productId
+            );
+        }
+
+        product.deactivate();
+
+        productRepository.save(
                 product
         );
     }

@@ -7,6 +7,7 @@ import org.springframework.http.ResponseEntity;
 
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.bind.MethodArgumentNotValidException;
 
 import java.time.Instant;
 
@@ -55,6 +56,20 @@ public class GlobalExceptionHandler {
         );
     }
 
+    @ExceptionHandler(SkuAlreadyExistsException.class)
+    public ResponseEntity<ApiError> handleSkuAlreadyExists(
+            SkuAlreadyExistsException exception,
+            HttpServletRequest request
+    ) {
+
+        return buildResponse(
+                HttpStatus.CONFLICT,
+                "SKU_ALREADY_EXISTS",
+                exception.getMessage(),
+                request.getRequestURI()
+        );
+    }
+
     private ResponseEntity<ApiError> buildResponse(
             HttpStatus status,
             String error,
@@ -74,5 +89,36 @@ public class GlobalExceptionHandler {
         return ResponseEntity
                 .status(status)
                 .body(response);
+    }
+
+    @ExceptionHandler(
+            MethodArgumentNotValidException.class
+    )
+    public ResponseEntity<ApiError> handleValidation(
+            MethodArgumentNotValidException exception,
+            HttpServletRequest request
+    ) {
+
+        String message =
+                exception
+                        .getBindingResult()
+                        .getFieldErrors()
+                        .stream()
+                        .findFirst()
+                        .map(error ->
+                                error.getField()
+                                        + ": "
+                                        + error.getDefaultMessage()
+                        )
+                        .orElse(
+                                "Request validation failed"
+                        );
+
+        return buildResponse(
+                HttpStatus.BAD_REQUEST,
+                "VALIDATION_ERROR",
+                message,
+                request.getRequestURI()
+        );
     }
 }

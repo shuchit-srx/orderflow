@@ -12,9 +12,9 @@ public interface ProductRepository
         extends JpaRepository<Product, UUID>,
         JpaSpecificationExecutor<Product> {
 
-    Optional<Product> findBySku(String sku);
-
     boolean existsBySku(String sku);
 
-    Optional<Product> findByIdAndActiveTrue(UUID id);
+    Optional<Product> findByIdAndActiveTrue(
+            UUID id
+    );
 }
