@@ -7,11 +7,8 @@ import org.springframework.http.HttpMethod;
 
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configurers.AbstractHttpConfigurer;
-
 import org.springframework.security.config.http.SessionCreationPolicy;
-
 import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationConverter;
-
 import org.springframework.security.web.SecurityFilterChain;
 
 @Configuration
@@ -24,9 +21,7 @@ public class SecurityConfig {
     ) {
 
         http
-                .csrf(
-                        AbstractHttpConfigurer::disable
-                )
+                .csrf(AbstractHttpConfigurer::disable)
 
                 .sessionManagement(session ->
                         session.sessionCreationPolicy(
@@ -36,13 +31,18 @@ public class SecurityConfig {
 
                 .authorizeHttpRequests(auth -> auth
 
-                        /*
-                         * Health endpoint
-                         */
                         .requestMatchers(
                                 "/actuator/health"
                         )
                         .permitAll()
+
+                        /*
+                         * All admin endpoints.
+                         */
+                        .requestMatchers(
+                                "/api/v1/admin/**"
+                        )
+                        .hasRole("ADMIN")
 
                         /*
                          * Public product reads.
@@ -63,8 +63,7 @@ public class SecurityConfig {
                         .permitAll()
 
                         /*
-                         * Product mutations:
-                         * ADMIN only.
+                         * Product write operations.
                          */
                         .requestMatchers(
                                 HttpMethod.POST,
@@ -84,22 +83,16 @@ public class SecurityConfig {
                         )
                         .hasRole("ADMIN")
 
-                        /*
-                         * Everything else requires
-                         * authentication for now.
-                         */
                         .anyRequest()
                         .authenticated()
                 )
 
-                .oauth2ResourceServer(
-                        oauth2 ->
-                                oauth2.jwt(
-                                        jwt ->
-                                                jwt.jwtAuthenticationConverter(
-                                                        jwtAuthenticationConverter
-                                                )
+                .oauth2ResourceServer(oauth2 ->
+                        oauth2.jwt(jwt ->
+                                jwt.jwtAuthenticationConverter(
+                                        jwtAuthenticationConverter
                                 )
+                        )
                 );
 
         return http.build();

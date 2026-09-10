@@ -6,6 +6,9 @@ import com.orderflow.inventory.exception.InventoryNotFoundException;
 import com.orderflow.inventory.exception.ProductNotFoundException;
 import com.orderflow.inventory.repository.InventoryRepository;
 import com.orderflow.inventory.repository.ProductRepository;
+import com.orderflow.inventory.dto.inventory.AdminInventoryResponse;
+import com.orderflow.inventory.dto.inventory.StockAdjustmentRequest;
+import com.orderflow.inventory.exception.InsufficientStockException;
 
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -58,6 +61,80 @@ public class InventoryService {
 
         return InventoryResponse.from(
                 inventory
+        );
+    }
+
+    @Transactional
+    public AdminInventoryResponse adjustInventory(
+            UUID productId,
+            StockAdjustmentRequest request
+    ) {
+
+        /*
+         * Don't modify inventory belonging to an
+         * inactive/nonexistent public product.
+         */
+        if (productRepository
+                .findByIdAndActiveTrue(productId)
+                .isEmpty()) {
+
+            throw new ProductNotFoundException(
+                    productId
+            );
+        }
+
+        int delta = request.delta();
+
+        if (delta == 0) {
+
+            throw new IllegalArgumentException(
+                    "Inventory adjustment cannot be zero"
+            );
+        }
+
+        Inventory inventory =
+                inventoryRepository
+                        .findByProductIdForUpdate(
+                                productId
+                        )
+                        .orElseThrow(() ->
+                                new InventoryNotFoundException(
+                                        productId
+                                )
+                        );
+
+        if (delta < 0) {
+
+            long requestedReduction =
+                    -(long) delta;
+
+            if (requestedReduction
+                    > inventory.getAvailableQuantity()) {
+
+                throw new InsufficientStockException(
+                        productId,
+                        inventory.getAvailableQuantity(),
+                        (int) requestedReduction
+                );
+            }
+        }
+
+        inventory.adjustAvailableQuantity(
+                delta
+        );
+
+        /*
+         * Flush so @UpdateTimestamp is updated
+         * before building the response.
+         */
+        Inventory updatedInventory =
+                inventoryRepository
+                        .saveAndFlush(
+                                inventory
+                        );
+
+        return AdminInventoryResponse.from(
+                updatedInventory
         );
     }
 }

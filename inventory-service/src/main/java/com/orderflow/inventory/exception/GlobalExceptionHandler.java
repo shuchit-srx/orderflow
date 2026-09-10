@@ -8,7 +8,6 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.bind.MethodArgumentNotValidException;
-
 import java.time.Instant;
 
 @RestControllerAdvice
@@ -65,6 +64,24 @@ public class GlobalExceptionHandler {
         return buildResponse(
                 HttpStatus.CONFLICT,
                 "SKU_ALREADY_EXISTS",
+                exception.getMessage(),
+                request.getRequestURI()
+        );
+    }
+
+    @ExceptionHandler(
+            InsufficientStockException.class
+    )
+    public ResponseEntity<ApiError>
+    handleInsufficientStock(
+
+            InsufficientStockException exception,
+            HttpServletRequest request
+    ) {
+
+        return buildResponse(
+                HttpStatus.CONFLICT,
+                "INSUFFICIENT_STOCK",
                 exception.getMessage(),
                 request.getRequestURI()
         );
