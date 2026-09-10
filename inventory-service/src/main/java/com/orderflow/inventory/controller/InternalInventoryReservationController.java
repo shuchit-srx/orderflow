@@ -6,7 +6,7 @@ import com.orderflow.inventory.dto.reservation.ReserveInventoryRequest;
 import com.orderflow.inventory.service.InventoryReservationService;
 
 import jakarta.validation.Valid;
-
+import java.util.UUID;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 
@@ -46,5 +46,35 @@ public class InternalInventoryReservationController {
         return ResponseEntity
                 .status(HttpStatus.CREATED)
                 .body(response);
+    }
+
+    @PostMapping("/{orderId}/confirm")
+    public ResponseEntity<ReservationResponse>
+    confirm(
+
+            @PathVariable
+            UUID orderId
+    ) {
+
+        return ResponseEntity.ok(
+                reservationService.confirm(
+                        orderId
+                )
+        );
+    }
+
+    @PostMapping("/{orderId}/release")
+    public ResponseEntity<ReservationResponse>
+    release(
+
+            @PathVariable
+            UUID orderId
+    ) {
+
+        return ResponseEntity.ok(
+                reservationService.release(
+                        orderId
+                )
+        );
     }
 }

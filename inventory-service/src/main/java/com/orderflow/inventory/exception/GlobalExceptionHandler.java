@@ -156,4 +156,58 @@ public class GlobalExceptionHandler {
                 request.getRequestURI()
         );
     }
+
+    @ExceptionHandler(
+            ReservationNotFoundException.class
+    )
+    public ResponseEntity<ApiError>
+    handleReservationNotFound(
+
+            ReservationNotFoundException exception,
+            HttpServletRequest request
+    ) {
+
+        return buildResponse(
+                HttpStatus.NOT_FOUND,
+                "RESERVATION_NOT_FOUND",
+                exception.getMessage(),
+                request.getRequestURI()
+        );
+    }
+
+    @ExceptionHandler(
+            InvalidReservationStateException.class
+    )
+    public ResponseEntity<ApiError>
+    handleInvalidReservationState(
+
+            InvalidReservationStateException exception,
+            HttpServletRequest request
+    ) {
+
+        return buildResponse(
+                HttpStatus.CONFLICT,
+                "INVALID_RESERVATION_STATE",
+                exception.getMessage(),
+                request.getRequestURI()
+        );
+    }
+
+    @ExceptionHandler(
+            InventoryConsistencyException.class
+    )
+    public ResponseEntity<ApiError>
+    handleInventoryConsistency(
+
+            InventoryConsistencyException exception,
+            HttpServletRequest request
+    ) {
+
+        return buildResponse(
+                HttpStatus.INTERNAL_SERVER_ERROR,
+                "INVENTORY_CONSISTENCY_ERROR",
+                exception.getMessage(),
+                request.getRequestURI()
+        );
+    }
 }

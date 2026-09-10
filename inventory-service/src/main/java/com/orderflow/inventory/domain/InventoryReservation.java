@@ -138,4 +138,16 @@ public class InventoryReservation {
 
         items.add(item);
     }
+
+    public void markConfirmed() {
+        this.status = ReservationStatus.CONFIRMED;
+    }
+
+    public void markReleased() {
+        this.status = ReservationStatus.RELEASED;
+    }
+
+    public void markExpired() {
+        this.status = ReservationStatus.EXPIRED;
+    }
 }

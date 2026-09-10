@@ -49,4 +49,46 @@ public interface InventoryRepository
             @Param("quantity")
             int quantity
     );
+
+    @Modifying
+    @Query(
+            value = """
+                UPDATE inventory
+                SET reserved_quantity =
+                        reserved_quantity - :quantity,
+                    updated_at = CURRENT_TIMESTAMP
+                WHERE product_id = :productId
+                  AND reserved_quantity >= :quantity
+                """,
+            nativeQuery = true
+    )
+    int confirmReservedStock(
+            @Param("productId")
+            UUID productId,
+
+            @Param("quantity")
+            int quantity
+    );
+
+    @Modifying
+    @Query(
+            value = """
+                UPDATE inventory
+                SET available_quantity =
+                        available_quantity + :quantity,
+                    reserved_quantity =
+                        reserved_quantity - :quantity,
+                    updated_at = CURRENT_TIMESTAMP
+                WHERE product_id = :productId
+                  AND reserved_quantity >= :quantity
+                """,
+            nativeQuery = true
+    )
+    int releaseReservedStock(
+            @Param("productId")
+            UUID productId,
+
+            @Param("quantity")
+            int quantity
+    );
 }
