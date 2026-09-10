@@ -83,6 +83,12 @@ public class SecurityConfig {
                         )
                         .hasRole("ADMIN")
 
+                        .requestMatchers(
+                                HttpMethod.POST,
+                                "/api/v1/internal/inventory/reservations"
+                        )
+                        .hasRole("ADMIN")
+
                         .anyRequest()
                         .authenticated()
                 )

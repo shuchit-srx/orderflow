@@ -20,4 +20,17 @@ public class InsufficientStockException
                         + availableQuantity
         );
     }
+
+    public InsufficientStockException(
+            UUID productId,
+            int requestedQuantity
+    ) {
+
+        super(
+                "Insufficient available stock for product "
+                        + productId
+                        + ". Requested quantity: "
+                        + requestedQuantity
+        );
+    }
 }

@@ -19,3 +19,7 @@ security:
   jwt:
     issuer: orderflow-user-service
     public-key-location: file:./keys/public.pem
+
+inventory:
+  reservation:
+    ttl-seconds: 900

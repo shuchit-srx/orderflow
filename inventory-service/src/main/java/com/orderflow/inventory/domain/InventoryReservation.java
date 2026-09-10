@@ -59,7 +59,7 @@ public class InventoryReservation {
             cascade = CascadeType.ALL,
             orphanRemoval = true
     )
-    private final List<InventoryReservationItem> items =
+    private List<InventoryReservationItem> items =
             new ArrayList<>();
 
     @CreationTimestamp

@@ -17,4 +17,8 @@ public interface ProductRepository
     Optional<Product> findByIdAndActiveTrue(
             UUID id
     );
+
+    boolean existsByIdAndActiveTrue(
+            UUID id
+    );
 }
