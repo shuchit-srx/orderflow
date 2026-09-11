@@ -6,17 +6,13 @@ import com.orderflow.inventory.dto.reservation.ReservationItemRequest;
 import com.orderflow.inventory.dto.reservation.ReservationResponse;
 import com.orderflow.inventory.dto.reservation.ReserveInventoryRequest;
 import com.orderflow.inventory.exception.InventoryConsistencyException;
-import com.orderflow.inventory.exception.InventoryNotFoundException;
-import com.orderflow.inventory.exception.InsufficientStockException;
 import com.orderflow.inventory.exception.InvalidReservationStateException;
-import com.orderflow.inventory.exception.ProductNotFoundException;
 import com.orderflow.inventory.exception.ReservationConflictException;
 import com.orderflow.inventory.exception.ReservationNotFoundException;
 import com.orderflow.inventory.repository.InventoryRepository;
 import com.orderflow.inventory.repository.InventoryReservationRepository;
-import com.orderflow.inventory.repository.ProductRepository;
 
-import org.springframework.beans.factory.annotation.Value;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -35,24 +31,21 @@ import java.util.UUID;
 public class InventoryReservationService {
 
     private final InventoryRepository inventoryRepository;
-    private final ProductRepository productRepository;
     private final InventoryReservationRepository reservationRepository;
-    private final long reservationTtlSeconds;
+
+    private final InventoryReservationCreationService
+            creationService;
 
     public InventoryReservationService(
             InventoryRepository inventoryRepository,
-            ProductRepository productRepository,
             InventoryReservationRepository reservationRepository,
-            @Value("${inventory.reservation.ttl-seconds:900}")
-            long reservationTtlSeconds
+            InventoryReservationCreationService creationService
     ) {
         this.inventoryRepository = inventoryRepository;
-        this.productRepository = productRepository;
         this.reservationRepository = reservationRepository;
-        this.reservationTtlSeconds = reservationTtlSeconds;
+        this.creationService = creationService;
     }
 
-    @Transactional
     public ReservationResponse reserve(
             ReserveInventoryRequest request
     ) {
@@ -64,7 +57,9 @@ public class InventoryReservationService {
                         .stream()
                         .sorted(
                                 Comparator.comparing(
-                                        item -> item.productId().toString()
+                                        item ->
+                                                item.productId()
+                                                        .toString()
                                 )
                         )
                         .toList();
@@ -82,86 +77,36 @@ public class InventoryReservationService {
 
         if (existing.isPresent()) {
 
-            InventoryReservation reservation =
-                    existing.get();
-
-            if (!reservation
-                    .getRequestHash()
-                    .equals(requestHash)) {
-
-                throw new ReservationConflictException(
-                        request.orderId()
-                );
-            }
-
-            return ReservationResponse.from(
-                    reservation
+            return resolveExistingReservation(
+                    existing.get(),
+                    requestHash
             );
         }
 
-        for (ReservationItemRequest item : sortedItems) {
+        try {
 
-            UUID productId = item.productId();
-            int quantity = item.quantity();
+            return creationService.create(
+                    request.orderId(),
+                    requestHash,
+                    sortedItems
+            );
 
-            if (!productRepository
-                    .existsByIdAndActiveTrue(productId)) {
+        } catch (DataIntegrityViolationException exception) {
 
-                throw new ProductNotFoundException(
-                        productId
-                );
-            }
-
-            int updatedRows =
-                    inventoryRepository.reserveStock(
-                            productId,
-                            quantity
+            var winner =
+                    reservationRepository.findByOrderId(
+                            request.orderId()
                     );
 
-            if (updatedRows == 0) {
-
-                if (!inventoryRepository
-                        .existsById(productId)) {
-
-                    throw new InventoryNotFoundException(
-                            productId
-                    );
-                }
-
-                throw new InsufficientStockException(
-                        productId,
-                        quantity
-                );
+            if (winner.isEmpty()) {
+                throw exception;
             }
-        }
 
-        Instant expiresAt =
-                Instant.now()
-                        .plusSeconds(
-                                reservationTtlSeconds
-                        );
-
-        InventoryReservation reservation =
-                new InventoryReservation(
-                        request.orderId(),
-                        requestHash,
-                        expiresAt
-                );
-
-        for (ReservationItemRequest item : sortedItems) {
-
-            reservation.addItem(
-                    item.productId(),
-                    item.quantity()
+            return resolveExistingReservation(
+                    winner.get(),
+                    requestHash
             );
         }
-
-        InventoryReservation saved =
-                reservationRepository.saveAndFlush(
-                        reservation
-                );
-
-        return ReservationResponse.from(saved);
     }
 
     @Transactional
@@ -216,10 +161,9 @@ public class InventoryReservationService {
         reservation.markConfirmed();
 
         InventoryReservation saved =
-                reservationRepository
-                        .saveAndFlush(
-                                reservation
-                        );
+                reservationRepository.saveAndFlush(
+                        reservation
+                );
 
         return ReservationResponse.from(saved);
     }
@@ -264,17 +208,14 @@ public class InventoryReservationService {
             );
         }
 
-        restoreReservedStock(
-                reservation
-        );
+        restoreReservedStock(reservation);
 
         reservation.markReleased();
 
         InventoryReservation saved =
-                reservationRepository
-                        .saveAndFlush(
-                                reservation
-                        );
+                reservationRepository.saveAndFlush(
+                        reservation
+                );
 
         return ReservationResponse.from(saved);
     }
@@ -306,9 +247,7 @@ public class InventoryReservationService {
             return false;
         }
 
-        restoreReservedStock(
-                reservation
-        );
+        restoreReservedStock(reservation);
 
         reservation.markExpired();
 
@@ -317,6 +256,25 @@ public class InventoryReservationService {
         );
 
         return true;
+    }
+
+    private ReservationResponse resolveExistingReservation(
+            InventoryReservation reservation,
+            String requestHash
+    ) {
+
+        if (!reservation
+                .getRequestHash()
+                .equals(requestHash)) {
+
+            throw new ReservationConflictException(
+                    reservation.getOrderId()
+            );
+        }
+
+        return ReservationResponse.from(
+                reservation
+        );
     }
 
     private void restoreReservedStock(
@@ -345,14 +303,11 @@ public class InventoryReservationService {
             List<ReservationItemRequest> items
     ) {
 
-        Set<UUID> productIds =
-                new HashSet<>();
+        Set<UUID> productIds = new HashSet<>();
 
         for (ReservationItemRequest item : items) {
 
-            if (!productIds.add(
-                    item.productId()
-            )) {
+            if (!productIds.add(item.productId())) {
 
                 throw new IllegalArgumentException(
                         "Duplicate product in reservation: "
