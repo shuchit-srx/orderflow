@@ -1,2 +1,13 @@
-# Routes are intentionally added in Phase 5.
-# Phase 1 only proves that the Gateway application boots successfully.
+server:
+  port: 8080
+
+services:
+  user: ${USER_SERVICE_URL:http://localhost:8081}
+  inventory: ${INVENTORY_SERVICE_URL:http://localhost:8082}
+  order: ${ORDER_SERVICE_URL:http://localhost:8083}
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health
