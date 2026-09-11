@@ -127,4 +127,77 @@ public class OrderService {
                 orders.getTotalPages()
         );
     }
+
+    @Transactional
+    public OrderResponse markInventoryReserved(
+            UUID orderId
+    ) {
+
+        Order order =
+                getOrderForUpdate(orderId);
+
+        order.markInventoryReserved();
+
+        orderRepository.flush();
+
+        return OrderResponse.from(order);
+    }
+
+    @Transactional
+    public OrderResponse confirmOrder(
+            UUID orderId
+    ) {
+
+        Order order =
+                getOrderForUpdate(orderId);
+
+        order.confirm();
+
+        orderRepository.flush();
+
+        return OrderResponse.from(order);
+    }
+
+    @Transactional
+    public OrderResponse cancelOrder(
+            UUID orderId
+    ) {
+
+        Order order =
+                getOrderForUpdate(orderId);
+
+        order.cancel();
+
+        orderRepository.flush();
+
+        return OrderResponse.from(order);
+    }
+
+    @Transactional
+    public OrderResponse failOrder(
+            UUID orderId
+    ) {
+
+        Order order =
+                getOrderForUpdate(orderId);
+
+        order.fail();
+
+        orderRepository.flush();
+
+        return OrderResponse.from(order);
+    }
+
+    private Order getOrderForUpdate(
+            UUID orderId
+    ) {
+
+        return orderRepository
+                .findByIdForUpdate(orderId)
+                .orElseThrow(() ->
+                        new OrderNotFoundException(
+                                orderId
+                        )
+                );
+    }
 }

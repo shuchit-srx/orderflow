@@ -37,6 +37,11 @@ public class SecurityConfig {
                                 .permitAll()
 
                                 .requestMatchers(
+                                        "/api/v1/internal/orders/**"
+                                )
+                                .hasRole("ADMIN")
+
+                                .requestMatchers(
                                         "/api/v1/orders",
                                         "/api/v1/orders/**"
                                 )

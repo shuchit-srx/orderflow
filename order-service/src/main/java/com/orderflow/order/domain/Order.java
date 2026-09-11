@@ -5,6 +5,8 @@ import jakarta.persistence.*;
 import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.UpdateTimestamp;
 
+import com.orderflow.order.exception.InvalidOrderStateException;
+
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.ArrayList;
@@ -105,6 +107,91 @@ public class Order {
                                 BigDecimal.ZERO,
                                 BigDecimal::add
                         );
+    }
+
+    public void markInventoryReserved() {
+
+        if (status == OrderStatus.INVENTORY_RESERVED) {
+            return;
+        }
+
+        requireState(
+                OrderStatus.CREATED,
+                OrderStatus.INVENTORY_RESERVED
+        );
+
+        this.status =
+                OrderStatus.INVENTORY_RESERVED;
+    }
+
+    public void confirm() {
+
+        if (status == OrderStatus.CONFIRMED) {
+            return;
+        }
+
+        requireState(
+                OrderStatus.INVENTORY_RESERVED,
+                OrderStatus.CONFIRMED
+        );
+
+        this.status =
+                OrderStatus.CONFIRMED;
+    }
+
+    public void cancel() {
+
+        if (status == OrderStatus.CANCELLED) {
+            return;
+        }
+
+        if (status != OrderStatus.CREATED
+                && status != OrderStatus.INVENTORY_RESERVED) {
+
+            throw new InvalidOrderStateException(
+                    id,
+                    status,
+                    OrderStatus.CANCELLED
+            );
+        }
+
+        this.status =
+                OrderStatus.CANCELLED;
+    }
+
+    public void fail() {
+
+        if (status == OrderStatus.FAILED) {
+            return;
+        }
+
+        if (status != OrderStatus.CREATED
+                && status != OrderStatus.INVENTORY_RESERVED) {
+
+            throw new InvalidOrderStateException(
+                    id,
+                    status,
+                    OrderStatus.FAILED
+            );
+        }
+
+        this.status =
+                OrderStatus.FAILED;
+    }
+
+    private void requireState(
+            OrderStatus requiredStatus,
+            OrderStatus targetStatus
+    ) {
+
+        if (status != requiredStatus) {
+
+            throw new InvalidOrderStateException(
+                    id,
+                    status,
+                    targetStatus
+            );
+        }
     }
 
     public UUID getId() {

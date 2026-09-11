@@ -71,6 +71,24 @@ public class GlobalExceptionHandler {
         );
     }
 
+    @ExceptionHandler(
+            InvalidOrderStateException.class
+    )
+    public ResponseEntity<ApiError>
+    handleInvalidOrderState(
+
+            InvalidOrderStateException exception,
+            HttpServletRequest request
+    ) {
+
+        return buildResponse(
+                HttpStatus.CONFLICT,
+                "INVALID_ORDER_STATE",
+                exception.getMessage(),
+                request.getRequestURI()
+        );
+    }
+
     private ResponseEntity<ApiError> buildResponse(
             HttpStatus status,
             String error,
