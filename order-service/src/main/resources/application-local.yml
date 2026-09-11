@@ -21,6 +21,12 @@ spring:
     username: ${RABBITMQ_USERNAME:orderflow}
     password: ${RABBITMQ_PASSWORD:orderflow}
 
+services:
+  inventory:
+    base-url: ${INVENTORY_SERVICE_URL:http://localhost:8082}
+    connect-timeout: 2s
+    read-timeout: 3s
+
 security:
   jwt:
     issuer: orderflow-user-service

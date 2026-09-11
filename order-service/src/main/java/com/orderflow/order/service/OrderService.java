@@ -17,6 +17,17 @@ import org.springframework.data.domain.Sort;
 
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import com.orderflow.order.client.InventoryClient;
+import com.orderflow.order.client.dto.InventoryProductResponse;
+
+import com.orderflow.order.exception.DuplicateProductException;
+
+import com.orderflow.order.service.model.ResolvedOrderItem;
+
+import java.util.ArrayList;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Set;
 
 import java.util.UUID;
 
@@ -27,40 +38,83 @@ public class OrderService {
 
     private final OrderRepository orderRepository;
 
+    private final InventoryClient inventoryClient;
+
+    private final OrderPersistenceService orderPersistenceService;
+
     public OrderService(
-            OrderRepository orderRepository
+            OrderRepository orderRepository,
+            InventoryClient inventoryClient,
+            OrderPersistenceService orderPersistenceService
     ) {
+
         this.orderRepository =
                 orderRepository;
+
+        this.inventoryClient =
+                inventoryClient;
+
+        this.orderPersistenceService =
+                orderPersistenceService;
     }
 
-    @Transactional
     public OrderResponse createOrder(
             UUID customerId,
             CreateOrderRequest request
     ) {
 
-        Order order =
-                new Order(customerId);
+        validateNoDuplicateProducts(
+                request.items()
+        );
+
+        List<ResolvedOrderItem>
+                resolvedItems =
+                new ArrayList<>();
 
         for (CreateOrderItemRequest item
                 : request.items()) {
 
-            order.addItem(
-                    item.productId(),
-                    item.sku().trim(),
-                    item.productName().trim(),
-                    item.unitPrice(),
-                    item.quantity()
+            InventoryProductResponse product =
+                    inventoryClient.getProduct(
+                            item.productId()
+                    );
+
+            resolvedItems.add(
+                    new ResolvedOrderItem(
+                            product.id(),
+                            product.sku(),
+                            product.name(),
+                            product.price(),
+                            item.quantity()
+                    )
             );
         }
 
-        Order saved =
-                orderRepository.saveAndFlush(
-                        order
+        return orderPersistenceService
+                .create(
+                        customerId,
+                        resolvedItems
                 );
+    }
 
-        return OrderResponse.from(saved);
+    private void validateNoDuplicateProducts(
+            List<CreateOrderItemRequest> items
+    ) {
+
+        Set<UUID> seen =
+                new HashSet<>();
+
+        for (CreateOrderItemRequest item : items) {
+
+            if (!seen.add(
+                    item.productId()
+            )) {
+
+                throw new DuplicateProductException(
+                        item.productId()
+                );
+            }
+        }
     }
 
     @Transactional(readOnly = true)

@@ -89,6 +89,78 @@ public class GlobalExceptionHandler {
         );
     }
 
+    @ExceptionHandler(
+            ProductUnavailableException.class
+    )
+    public ResponseEntity<ApiError>
+    handleProductUnavailable(
+
+            ProductUnavailableException exception,
+            HttpServletRequest request
+    ) {
+
+        return buildResponse(
+                HttpStatus.NOT_FOUND,
+                "PRODUCT_NOT_AVAILABLE",
+                exception.getMessage(),
+                request.getRequestURI()
+        );
+    }
+
+    @ExceptionHandler(
+            InventoryServiceUnavailableException.class
+    )
+    public ResponseEntity<ApiError>
+    handleInventoryUnavailable(
+
+            InventoryServiceUnavailableException exception,
+            HttpServletRequest request
+    ) {
+
+        return buildResponse(
+                HttpStatus.SERVICE_UNAVAILABLE,
+                "INVENTORY_SERVICE_UNAVAILABLE",
+                exception.getMessage(),
+                request.getRequestURI()
+        );
+    }
+
+    @ExceptionHandler(
+            InventoryServiceException.class
+    )
+    public ResponseEntity<ApiError>
+    handleInventoryServiceError(
+
+            InventoryServiceException exception,
+            HttpServletRequest request
+    ) {
+
+        return buildResponse(
+                HttpStatus.BAD_GATEWAY,
+                "INVENTORY_SERVICE_ERROR",
+                exception.getMessage(),
+                request.getRequestURI()
+        );
+    }
+
+    @ExceptionHandler(
+            DuplicateProductException.class
+    )
+    public ResponseEntity<ApiError>
+    handleDuplicateProduct(
+
+            DuplicateProductException exception,
+            HttpServletRequest request
+    ) {
+
+        return buildResponse(
+                HttpStatus.BAD_REQUEST,
+                "DUPLICATE_PRODUCT",
+                exception.getMessage(),
+                request.getRequestURI()
+        );
+    }
+
     private ResponseEntity<ApiError> buildResponse(
             HttpStatus status,
             String error,

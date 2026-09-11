@@ -1,5 +1,8 @@
 package com.orderflow.order.support;
 
+import com.orderflow.order.client.InventoryClient;
+import com.orderflow.order.client.dto.InventoryProductResponse;
+
 import org.junit.jupiter.api.BeforeEach;
 
 import org.springframework.beans.factory.annotation.Autowired;
@@ -10,13 +13,18 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
 
 import org.testcontainers.postgresql.PostgreSQLContainer;
 import org.testcontainers.utility.DockerImageName;
 
 import java.math.BigDecimal;
+import java.time.Instant;
 import java.util.Objects;
 import java.util.UUID;
+
+import static org.mockito.Mockito.reset;
+import static org.mockito.Mockito.when;
 
 @SpringBootTest
 @ActiveProfiles("test")
@@ -87,6 +95,9 @@ public abstract class AbstractIntegrationTest {
     @Autowired
     protected JdbcTemplate jdbcTemplate;
 
+    @MockitoBean
+    protected InventoryClient inventoryClient;
+
     @BeforeEach
     void resetDatabase() {
 
@@ -97,6 +108,46 @@ public abstract class AbstractIntegrationTest {
         jdbcTemplate.update(
                 "DELETE FROM orders"
         );
+
+        reset(inventoryClient);
+
+        when(
+                inventoryClient.getProduct(
+                        IPHONE_ID
+                )
+        )
+                .thenReturn(
+                        new InventoryProductResponse(
+                                IPHONE_ID,
+                                "IPHONE-15",
+                                "iPhone 15",
+                                "Apple smartphone",
+                                new BigDecimal(
+                                        "69999.00"
+                                ),
+                                Instant.now(),
+                                Instant.now()
+                        )
+                );
+
+        when(
+                inventoryClient.getProduct(
+                        PIXEL_ID
+                )
+        )
+                .thenReturn(
+                        new InventoryProductResponse(
+                                PIXEL_ID,
+                                "PIXEL-9",
+                                "Google Pixel 9",
+                                "Google smartphone",
+                                new BigDecimal(
+                                        "59999.00"
+                                ),
+                                Instant.now(),
+                                Instant.now()
+                        )
+                );
     }
 
     protected String orderStatus(
@@ -114,7 +165,9 @@ public abstract class AbstractIntegrationTest {
                         orderId
                 );
 
-        return Objects.requireNonNull(value);
+        return Objects.requireNonNull(
+                value
+        );
     }
 
     protected BigDecimal total(
@@ -132,7 +185,9 @@ public abstract class AbstractIntegrationTest {
                         orderId
                 );
 
-        return Objects.requireNonNull(value);
+        return Objects.requireNonNull(
+                value
+        );
     }
 
     protected long orderCount() {
@@ -146,6 +201,8 @@ public abstract class AbstractIntegrationTest {
                         Long.class
                 );
 
-        return Objects.requireNonNull(value);
+        return Objects.requireNonNull(
+                value
+        );
     }
 }

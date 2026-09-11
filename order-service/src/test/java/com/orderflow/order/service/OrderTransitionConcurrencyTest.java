@@ -42,11 +42,6 @@ class OrderTransitionConcurrencyTest
                                         List.of(
                                                 new CreateOrderItemRequest(
                                                         IPHONE_ID,
-                                                        "IPHONE-15",
-                                                        "iPhone 15",
-                                                        new BigDecimal(
-                                                                "69999.00"
-                                                        ),
                                                         1
                                                 )
                                         )

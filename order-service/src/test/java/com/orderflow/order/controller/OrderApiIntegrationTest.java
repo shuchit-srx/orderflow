@@ -19,7 +19,6 @@ import org.springframework.security.core.authority.SimpleGrantedAuthority;
 
 import org.springframework.test.web.servlet.MockMvc;
 
-import java.math.BigDecimal;
 import java.util.List;
 import java.util.UUID;
 
@@ -46,18 +45,15 @@ class OrderApiIntegrationTest
 
     private static final String CREATE_BODY =
             """
-            {
-              "items": [
-                {
-                  "productId":
-                    "11111111-1111-1111-1111-111111111111",
-                  "sku": "IPHONE-15",
-                  "productName": "iPhone 15",
-                  "unitPrice": 69999.00,
-                  "quantity": 2
-                }
-              ]
-            }
+                    {
+                      "items": [
+                        {
+                          "productId":
+                            "11111111-1111-1111-1111-111111111111",
+                          "quantity": 2
+                        }
+                      ]
+                    }
             """;
 
     @Test
@@ -392,11 +388,6 @@ class OrderApiIntegrationTest
                 List.of(
                         new CreateOrderItemRequest(
                                 IPHONE_ID,
-                                "IPHONE-15",
-                                "iPhone 15",
-                                new BigDecimal(
-                                        "69999.00"
-                                ),
                                 1
                         )
                 )
