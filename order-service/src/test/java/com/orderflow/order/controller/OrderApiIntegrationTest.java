@@ -115,7 +115,7 @@ class OrderApiIntegrationTest
                 )
                 .andExpect(
                         jsonPath("$.status")
-                                .value("CREATED")
+                                .value("CONFIRMED")
                 )
                 .andExpect(
                         jsonPath(

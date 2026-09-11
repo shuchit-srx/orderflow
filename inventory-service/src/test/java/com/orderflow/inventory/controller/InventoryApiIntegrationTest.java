@@ -22,6 +22,12 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 class InventoryApiIntegrationTest
         extends AbstractIntegrationTest {
 
+    private static final String INTERNAL_TOKEN_HEADER =
+            "X-Internal-Service-Token";
+
+    private static final String INTERNAL_TOKEN =
+            "test-internal-token";
+
     @Autowired
     private MockMvc mockMvc;
 
@@ -150,19 +156,16 @@ class InventoryApiIntegrationTest
     }
 
     @Test
-    void adminShouldCreateReservation()
+    void internalServiceShouldCreateReservation()
             throws Exception {
 
         mockMvc.perform(
                         post(
                                 "/api/v1/internal/inventory/reservations"
                         )
-                                .with(
-                                        jwt().authorities(
-                                                new SimpleGrantedAuthority(
-                                                        "ROLE_ADMIN"
-                                                )
-                                        )
+                                .header(
+                                        INTERNAL_TOKEN_HEADER,
+                                        INTERNAL_TOKEN
                                 )
                                 .contentType(
                                         MediaType.APPLICATION_JSON
@@ -227,7 +230,7 @@ class InventoryApiIntegrationTest
                                 )
                 )
                 .andExpect(
-                        status().isForbidden()
+                        status().isUnauthorized()
                 );
     }
 
@@ -239,12 +242,9 @@ class InventoryApiIntegrationTest
                         post(
                                 "/api/v1/internal/inventory/reservations"
                         )
-                                .with(
-                                        jwt().authorities(
-                                                new SimpleGrantedAuthority(
-                                                        "ROLE_ADMIN"
-                                                )
-                                        )
+                                .header(
+                                        INTERNAL_TOKEN_HEADER,
+                                        INTERNAL_TOKEN
                                 )
                                 .contentType(
                                         MediaType.APPLICATION_JSON
@@ -282,12 +282,9 @@ class InventoryApiIntegrationTest
                         post(
                                 "/api/v1/internal/inventory/reservations"
                         )
-                                .with(
-                                        jwt().authorities(
-                                                new SimpleGrantedAuthority(
-                                                        "ROLE_ADMIN"
-                                                )
-                                        )
+                                .header(
+                                        INTERNAL_TOKEN_HEADER,
+                                        INTERNAL_TOKEN
                                 )
                                 .contentType(
                                         MediaType.APPLICATION_JSON
@@ -316,6 +313,38 @@ class InventoryApiIntegrationTest
                                 .value(
                                         "INSUFFICIENT_STOCK"
                                 )
+                );
+    }
+
+    @Test
+    void missingInternalTokenShouldReturn401()
+            throws Exception {
+
+        mockMvc.perform(
+                        post(
+                                "/api/v1/internal/inventory/reservations"
+                        )
+                                .contentType(
+                                        MediaType.APPLICATION_JSON
+                                )
+                                .content(
+                                        """
+                                        {
+                                          "orderId":
+                                            "95000000-0000-0000-0000-000000000001",
+                                          "items": [
+                                            {
+                                              "productId":
+                                                "11111111-1111-1111-1111-111111111111",
+                                              "quantity": 1
+                                            }
+                                          ]
+                                        }
+                                        """
+                                )
+                )
+                .andExpect(
+                        status().isUnauthorized()
                 );
     }
 }

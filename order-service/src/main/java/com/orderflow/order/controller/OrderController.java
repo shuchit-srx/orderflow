@@ -3,7 +3,7 @@ package com.orderflow.order.controller;
 import com.orderflow.order.dto.CreateOrderRequest;
 import com.orderflow.order.dto.OrderPageResponse;
 import com.orderflow.order.dto.OrderResponse;
-
+import com.orderflow.order.service.OrderSagaService;
 import com.orderflow.order.security.CurrentCustomer;
 import com.orderflow.order.service.OrderService;
 
@@ -25,14 +25,22 @@ public class OrderController {
 
     private final OrderService orderService;
     private final CurrentCustomer currentCustomer;
+    private final OrderSagaService orderSagaService;
 
     public OrderController(
             OrderService orderService,
+            OrderSagaService orderSagaService,
             CurrentCustomer currentCustomer
     ) {
 
-        this.orderService = orderService;
-        this.currentCustomer = currentCustomer;
+        this.orderService =
+                orderService;
+
+        this.orderSagaService =
+                orderSagaService;
+
+        this.currentCustomer =
+                currentCustomer;
     }
 
     @PostMapping
@@ -50,7 +58,7 @@ public class OrderController {
                 currentCustomer.id(jwt);
 
         OrderResponse response =
-                orderService.createOrder(
+                orderSagaService.placeOrder(
                         customerId,
                         request
                 );

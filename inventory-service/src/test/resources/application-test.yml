@@ -15,6 +15,8 @@ security:
   jwt:
     issuer: orderflow-user-service
     public-key-location: classpath:keys/public.pem
+  internal:
+    token: test-internal-token
 
 inventory:
   reservation:

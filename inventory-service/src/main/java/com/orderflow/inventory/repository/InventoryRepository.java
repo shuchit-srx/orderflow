@@ -91,4 +91,23 @@ public interface InventoryRepository
             @Param("quantity")
             int quantity
     );
+
+    @Modifying
+    @Query(
+            value = """
+                UPDATE inventory
+                SET available_quantity =
+                        available_quantity + :quantity,
+                    updated_at = CURRENT_TIMESTAMP
+                WHERE product_id = :productId
+                """,
+            nativeQuery = true
+    )
+    int restoreConfirmedStock(
+            @Param("productId")
+            UUID productId,
+
+            @Param("quantity")
+            int quantity
+    );
 }

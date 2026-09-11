@@ -161,6 +161,42 @@ public class GlobalExceptionHandler {
         );
     }
 
+    @ExceptionHandler(
+            InventoryReservationRejectedException.class
+    )
+    public ResponseEntity<ApiError>
+    handleInventoryReservationRejected(
+
+            InventoryReservationRejectedException exception,
+            HttpServletRequest request
+    ) {
+
+        return buildResponse(
+                HttpStatus.CONFLICT,
+                "INVENTORY_RESERVATION_REJECTED",
+                exception.getMessage(),
+                request.getRequestURI()
+        );
+    }
+
+    @ExceptionHandler(
+            SagaCompensationException.class
+    )
+    public ResponseEntity<ApiError>
+    handleSagaCompensationFailure(
+
+                    SagaCompensationException exception,
+                    HttpServletRequest request
+            ) {
+
+        return buildResponse(
+                HttpStatus.SERVICE_UNAVAILABLE,
+                "SAGA_COMPENSATION_INCOMPLETE",
+                exception.getMessage(),
+                request.getRequestURI()
+        );
+    }
+
     private ResponseEntity<ApiError> buildResponse(
             HttpStatus status,
             String error,

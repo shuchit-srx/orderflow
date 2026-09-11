@@ -23,6 +23,8 @@ security:
   jwt:
     issuer: orderflow-user-service
     public-key-location: file:./keys/public.pem
+  internal:
+    token: ${INTERNAL_SERVICE_TOKEN:local-orderflow-internal-token-change-me}
 
 inventory:
   reservation:
