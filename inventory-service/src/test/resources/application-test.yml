@@ -1,0 +1,25 @@
+spring:
+  flyway:
+    enabled: true
+
+  jpa:
+    hibernate:
+      ddl-auto: validate
+
+  data:
+    redis:
+      repositories:
+        enabled: false
+
+security:
+  jwt:
+    issuer: orderflow-user-service
+    public-key-location: classpath:keys/public.pem
+
+inventory:
+  reservation:
+    ttl-seconds: 3600
+    expiry-scan-ms: 3600000
+
+  cache:
+    product-detail-ttl: 10m
