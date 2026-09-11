@@ -1,11 +1,14 @@
 package com.orderflow.order.service;
 
 import com.orderflow.order.domain.Order;
+
 import com.orderflow.order.dto.CreateOrderItemRequest;
 import com.orderflow.order.dto.CreateOrderRequest;
 import com.orderflow.order.dto.OrderPageResponse;
 import com.orderflow.order.dto.OrderResponse;
+
 import com.orderflow.order.exception.OrderNotFoundException;
+
 import com.orderflow.order.repository.OrderRepository;
 
 import org.springframework.data.domain.Page;
@@ -27,20 +30,21 @@ public class OrderService {
     public OrderService(
             OrderRepository orderRepository
     ) {
-        this.orderRepository = orderRepository;
+        this.orderRepository =
+                orderRepository;
     }
 
     @Transactional
     public OrderResponse createOrder(
+            UUID customerId,
             CreateOrderRequest request
     ) {
 
         Order order =
-                new Order(
-                        request.customerId()
-                );
+                new Order(customerId);
 
-        for (CreateOrderItemRequest item : request.items()) {
+        for (CreateOrderItemRequest item
+                : request.items()) {
 
             order.addItem(
                     item.productId(),
@@ -61,11 +65,16 @@ public class OrderService {
 
     @Transactional(readOnly = true)
     public OrderResponse getOrder(
+            UUID customerId,
             UUID orderId
     ) {
 
         Order order =
-                orderRepository.findById(orderId)
+                orderRepository
+                        .findByIdAndCustomerId(
+                                orderId,
+                                customerId
+                        )
                         .orElseThrow(() ->
                                 new OrderNotFoundException(
                                         orderId
@@ -77,6 +86,7 @@ public class OrderService {
 
     @Transactional(readOnly = true)
     public OrderPageResponse getOrders(
+            UUID customerId,
             int page,
             int size
     ) {
@@ -92,22 +102,25 @@ public class OrderService {
                 );
 
         Page<Order> orders =
-                orderRepository.findAll(
-                        PageRequest.of(
-                                safePage,
-                                safeSize,
-                                Sort.by(
-                                        Sort.Direction.DESC,
-                                        "createdAt"
+                orderRepository
+                        .findByCustomerId(
+                                customerId,
+                                PageRequest.of(
+                                        safePage,
+                                        safeSize,
+                                        Sort.by(
+                                                Sort.Direction.DESC,
+                                                "createdAt"
+                                        )
                                 )
-                        )
-                );
+                        );
 
         return new OrderPageResponse(
                 orders.getContent()
                         .stream()
                         .map(OrderResponse::from)
                         .toList(),
+
                 orders.getNumber(),
                 orders.getSize(),
                 orders.getTotalElements(),

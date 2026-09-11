@@ -20,3 +20,8 @@ spring:
     port: ${RABBITMQ_PORT:5672}
     username: ${RABBITMQ_USERNAME:orderflow}
     password: ${RABBITMQ_PASSWORD:orderflow}
+
+security:
+  jwt:
+    issuer: orderflow-user-service
+    public-key-location: file:./keys/public.pem

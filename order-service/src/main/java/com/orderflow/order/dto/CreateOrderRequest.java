@@ -2,19 +2,21 @@ package com.orderflow.order.dto;
 
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotEmpty;
-import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
 
 import java.util.List;
-import java.util.UUID;
 
 public record CreateOrderRequest(
 
-        @NotNull
-        UUID customerId,
-
-        @NotEmpty
-        @Size(max = 50)
+        @NotEmpty(
+                message =
+                        "At least one order item is required"
+        )
+        @Size(
+                max = 50,
+                message =
+                        "An order cannot contain more than 50 items"
+        )
         List<@Valid CreateOrderItemRequest> items
 ) {
 }

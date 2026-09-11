@@ -53,6 +53,24 @@ public class GlobalExceptionHandler {
         );
     }
 
+    @ExceptionHandler(
+            InvalidCustomerIdentityException.class
+    )
+    public ResponseEntity<ApiError>
+    handleInvalidCustomerIdentity(
+
+            InvalidCustomerIdentityException exception,
+            HttpServletRequest request
+    ) {
+
+        return buildResponse(
+                HttpStatus.UNAUTHORIZED,
+                "INVALID_CUSTOMER_IDENTITY",
+                exception.getMessage(),
+                request.getRequestURI()
+        );
+    }
+
     private ResponseEntity<ApiError> buildResponse(
             HttpStatus status,
             String error,
