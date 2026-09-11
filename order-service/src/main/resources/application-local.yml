@@ -1,12 +1,17 @@
+server:
+  port: 8083
+
 spring:
   datasource:
     url: jdbc:postgresql://${ORDER_DB_HOST:localhost}:${ORDER_DB_PORT:5432}/${ORDER_DB_NAME:orderflow_order}
     username: ${POSTGRES_USER:orderflow}
     password: ${POSTGRES_PASSWORD:orderflow}
+
   jpa:
-    open-in-view: false
     hibernate:
       ddl-auto: validate
+    open-in-view: false
+
   flyway:
     enabled: true
 
