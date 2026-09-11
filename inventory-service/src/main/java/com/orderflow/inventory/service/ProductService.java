@@ -6,23 +6,21 @@ import com.orderflow.inventory.dto.product.ProductResponse;
 import com.orderflow.inventory.exception.ProductNotFoundException;
 import com.orderflow.inventory.repository.ProductRepository;
 import com.orderflow.inventory.domain.Inventory;
-
 import com.orderflow.inventory.dto.product.CreateProductRequest;
 import com.orderflow.inventory.dto.product.UpdateProductRequest;
-
 import com.orderflow.inventory.exception.SkuAlreadyExistsException;
-
 import com.orderflow.inventory.repository.InventoryRepository;
-
-import org.springframework.dao.DataIntegrityViolationException;
+import com.orderflow.inventory.config.RedisCacheConfig;
 
 import jakarta.persistence.criteria.Predicate;
 
+import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.cache.annotation.CacheEvict;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
 import org.springframework.data.jpa.domain.Specification;
-
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -191,27 +189,31 @@ public class ProductService {
     }
 
     @Transactional(readOnly = true)
+    @Cacheable(
+            cacheNames = RedisCacheConfig.PRODUCT_BY_ID,
+            key = "#productId"
+    )
     public ProductResponse getProduct(
             UUID productId
     ) {
 
         Product product =
                 productRepository
-                        .findByIdAndActiveTrue(
-                                productId
-                        )
+                        .findByIdAndActiveTrue(productId)
                         .orElseThrow(() ->
                                 new ProductNotFoundException(
                                         productId
                                 )
                         );
 
-        return ProductResponse.from(
-                product
-        );
+        return ProductResponse.from(product);
     }
 
     @Transactional
+    @CacheEvict(
+            cacheNames = RedisCacheConfig.PRODUCT_BY_ID,
+            key = "#productId"
+    )
     public ProductResponse updateProduct(
             UUID productId,
             UpdateProductRequest request
@@ -259,31 +261,26 @@ public class ProductService {
     }
 
     @Transactional
+    @CacheEvict(
+            cacheNames = RedisCacheConfig.PRODUCT_BY_ID,
+            key = "#productId"
+    )
     public void deactivateProduct(
             UUID productId
     ) {
 
         Product product =
                 productRepository
-                        .findById(productId)
+                        .findByIdAndActiveTrue(productId)
                         .orElseThrow(() ->
                                 new ProductNotFoundException(
                                         productId
                                 )
                         );
 
-        if (!product.isActive()) {
-
-            throw new ProductNotFoundException(
-                    productId
-            );
-        }
-
         product.deactivate();
 
-        productRepository.save(
-                product
-        );
+        productRepository.save(product);
     }
 
     private Specification<Product> buildSpecification(
