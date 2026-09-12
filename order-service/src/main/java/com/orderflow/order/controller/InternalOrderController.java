@@ -2,6 +2,7 @@ package com.orderflow.order.controller;
 
 import com.orderflow.order.dto.OrderResponse;
 import com.orderflow.order.service.OrderService;
+import com.orderflow.order.service.OrderFinalizationService;
 
 import org.springframework.http.ResponseEntity;
 
@@ -16,12 +17,14 @@ import java.util.UUID;
 public class InternalOrderController {
 
     private final OrderService orderService;
+    private final OrderFinalizationService orderFinalizationService;
 
     public InternalOrderController(
-            OrderService orderService
+            OrderService orderService,
+            OrderFinalizationService orderFinalizationService
     ) {
-        this.orderService =
-                orderService;
+        this.orderService = orderService;
+        this.orderFinalizationService = orderFinalizationService;
     }
 
     @PostMapping(
@@ -53,9 +56,10 @@ public class InternalOrderController {
     ) {
 
         return ResponseEntity.ok(
-                orderService.confirmOrder(
-                        orderId
-                )
+                orderFinalizationService
+                        .confirmOrderAndCreateOutbox(
+                                orderId
+                        )
         );
     }
 

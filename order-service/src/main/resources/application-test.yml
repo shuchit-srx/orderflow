@@ -8,3 +8,14 @@ services:
     connect-timeout: 2s
     read-timeout: 3s
     internal-token: test-internal-token
+
+outbox:
+  publisher:
+    enabled: false
+    fixed-delay-ms: 1000
+    batch-size: 50
+    max-attempts: 10
+    stale-processing-after: 30s
+    base-backoff: 1s
+    max-backoff: 60s
+    confirm-timeout: 5s

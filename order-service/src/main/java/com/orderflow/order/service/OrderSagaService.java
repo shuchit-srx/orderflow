@@ -4,11 +4,9 @@ import com.orderflow.order.client.InventoryClient;
 
 import com.orderflow.order.client.dto.ReserveInventoryItemRequest;
 import com.orderflow.order.client.dto.ReserveInventoryRequest;
-
 import com.orderflow.order.dto.CreateOrderItemRequest;
 import com.orderflow.order.dto.CreateOrderRequest;
 import com.orderflow.order.dto.OrderResponse;
-import com.orderflow.order.messaging.OrderEventPublisher;
 import com.orderflow.order.messaging.event.OrderConfirmedEvent;
 import com.orderflow.order.exception.InventoryReservationRejectedException;
 import com.orderflow.order.exception.SagaCompensationException;
@@ -22,22 +20,24 @@ import java.util.UUID;
 public class OrderSagaService {
 
     private final OrderService orderService;
-    private final OrderEventPublisher orderEventPublisher;
+    private final OrderFinalizationService
+            orderFinalizationService;
     private final InventoryClient inventoryClient;
 
     public OrderSagaService(
             OrderService orderService,
             InventoryClient inventoryClient,
-            OrderEventPublisher orderEventPublisher
+            OrderFinalizationService orderFinalizationService
     ) {
+
         this.orderService =
                 orderService;
 
         this.inventoryClient =
                 inventoryClient;
 
-        this.orderEventPublisher =
-                orderEventPublisher;
+        this.orderFinalizationService =
+                orderFinalizationService;
     }
 
     public OrderResponse placeOrder(
@@ -82,24 +82,10 @@ public class OrderSagaService {
                     orderId
             );
 
-            OrderResponse confirmedOrder =
-                    orderService.confirmOrder(
+            return orderFinalizationService
+                    .confirmOrderAndCreateOutbox(
                             orderId
                     );
-
-            OrderConfirmedEvent event =
-                    OrderConfirmedEvent.create(
-                            confirmedOrder.id(),
-                            customerId,
-                            confirmedOrder.totalAmount()
-                    );
-
-            orderEventPublisher
-                    .publishOrderConfirmed(
-                            event
-                    );
-
-            return confirmedOrder;
 
         } catch (
                 InventoryReservationRejectedException exception

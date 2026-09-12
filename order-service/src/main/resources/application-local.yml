@@ -21,6 +21,8 @@ spring:
     username: ${RABBITMQ_USERNAME:orderflow}
     password: ${RABBITMQ_PASSWORD:orderflow}
 
+    publisher-confirm-type: correlated
+
 services:
   inventory:
     base-url: ${INVENTORY_SERVICE_URL:http://localhost:8082}
@@ -32,3 +34,14 @@ security:
   jwt:
     issuer: orderflow-user-service
     public-key-location: file:./keys/public.pem
+
+outbox:
+  publisher:
+    enabled: true
+    fixed-delay-ms: 1000
+    batch-size: 50
+    max-attempts: 10
+    stale-processing-after: 30s
+    base-backoff: 1s
+    max-backoff: 60s
+    confirm-timeout: 5s
