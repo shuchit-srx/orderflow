@@ -1,32 +1,54 @@
 spring:
   application:
     name: inventory-service
+
   profiles:
     default: local
+
   datasource:
     url: jdbc:postgresql://${INVENTORY_DB_HOST:localhost}:${INVENTORY_DB_PORT:5432}/${INVENTORY_DB_NAME:orderflow_inventory}
-    username: ${POSTGRES_USER:orderflow}
-    password: ${POSTGRES_PASSWORD:orderflow}
+    username: ${INVENTORY_DB_USERNAME:orderflow}
+    password: ${INVENTORY_DB_PASSWORD:change-me}
+
   jpa:
+    open-in-view: false
     hibernate:
       ddl-auto: validate
 
   flyway:
     enabled: true
 
+  data:
+    redis:
+      host: ${REDIS_HOST:localhost}
+      port: ${REDIS_PORT:6379}
+      connect-timeout: 2s
+      timeout: 2s
+
 server:
-  port: ${SERVER_PORT:8082}
+  port: ${INVENTORY_SERVICE_PORT:8082}
+
+security:
+  internal:
+    token: ${INTERNAL_SERVICE_TOKEN:local-internal-service-token}
+
+orderflow:
+  cache:
+    products:
+      ttl: ${PRODUCT_CACHE_TTL:PT10M}
 
 management:
   endpoints:
     web:
       exposure:
-        include: health,info
+        include:
+          - health
+          - metrics
+
   endpoint:
     health:
-      show-details: when_authorized
+      show-details: never
 
-info:
-  app:
-    name: inventory-service
-    version: 0.0.1-SNAPSHOT
+  metrics:
+    tags:
+      application: ${spring.application.name}

@@ -1,11 +1,11 @@
 package com.orderflow.inventory.config;
 
+import com.orderflow.inventory.cache.CacheNames;
 import com.orderflow.inventory.cache.LoggingCacheErrorHandler;
 import com.orderflow.inventory.dto.product.ProductResponse;
 
 import org.springframework.beans.factory.annotation.Value;
 
-import org.springframework.cache.CacheManager;
 import org.springframework.cache.annotation.CachingConfigurer;
 import org.springframework.cache.annotation.EnableCaching;
 import org.springframework.cache.interceptor.CacheErrorHandler;
@@ -22,72 +22,96 @@ import org.springframework.data.redis.serializer.JacksonJsonRedisSerializer;
 import org.springframework.data.redis.serializer.RedisSerializationContext;
 import org.springframework.data.redis.serializer.StringRedisSerializer;
 
+import tools.jackson.databind.ObjectMapper;
+
 import java.time.Duration;
+import java.util.Map;
 
 @Configuration
 @EnableCaching
-public class RedisCacheConfig
-        implements CachingConfigurer {
+public class RedisCacheConfig implements CachingConfigurer {
 
-    public static final String PRODUCT_BY_ID =
-            "productById";
+    private final Duration productTtl;
+
+    public RedisCacheConfig(
+            @Value(
+                    "${orderflow.cache.products.ttl:PT10M}"
+            )
+            Duration productTtl
+    ) {
+        this.productTtl = productTtl;
+    }
 
     @Bean
-    public CacheManager cacheManager(
+    public RedisCacheManager cacheManager(
             RedisConnectionFactory connectionFactory,
-
-            @Value(
-                    "${inventory.cache.product-detail-ttl:10m}"
-            )
-            Duration productDetailTtl
+            ObjectMapper objectMapper
     ) {
-
-        var keySerializer =
+        RedisSerializationContext.SerializationPair<String>
+                keySerialization =
                 RedisSerializationContext
                         .SerializationPair
                         .fromSerializer(
                                 new StringRedisSerializer()
                         );
 
-        var valueSerializer =
+        JacksonJsonRedisSerializer<ProductResponse>
+                productSerializer =
+                new JacksonJsonRedisSerializer<>(
+                        objectMapper,
+                        ProductResponse.class
+                );
+
+        RedisSerializationContext.SerializationPair<ProductResponse>
+                productValueSerialization =
                 RedisSerializationContext
                         .SerializationPair
                         .fromSerializer(
-                                new JacksonJsonRedisSerializer<>(
-                                        ProductResponse.class
-                                )
+                                productSerializer
                         );
 
-        RedisCacheConfiguration productCache =
+        RedisCacheConfiguration defaultConfiguration =
                 RedisCacheConfiguration
                         .defaultCacheConfig()
-                        .entryTtl(productDetailTtl)
                         .disableCachingNullValues()
+                        .serializeKeysWith(
+                                keySerialization
+                        )
                         .computePrefixWith(
                                 cacheName ->
                                         "orderflow:inventory:"
                                                 + cacheName
                                                 + "::"
-                        )
-                        .serializeKeysWith(
-                                keySerializer
+                        );
+
+        RedisCacheConfiguration productConfiguration =
+                defaultConfiguration
+                        .entryTtl(
+                                productTtl
                         )
                         .serializeValuesWith(
-                                valueSerializer
+                                productValueSerialization
                         );
 
         return RedisCacheManager
-                .builder(connectionFactory)
-                .cacheDefaults(productCache)
-                .withCacheConfiguration(
-                        PRODUCT_BY_ID,
-                        productCache
+                .builder(
+                        connectionFactory
                 )
-                .allowCreateOnMissingCache(false)
+                .cacheDefaults(
+                        defaultConfiguration
+                )
+                .withInitialCacheConfigurations(
+                        Map.of(
+                                CacheNames.PRODUCTS,
+                                productConfiguration
+                        )
+                )
                 .transactionAware()
+                .enableStatistics()
                 .build();
     }
 
+    @Bean
     @Override
     public CacheErrorHandler errorHandler() {
         return new LoggingCacheErrorHandler();

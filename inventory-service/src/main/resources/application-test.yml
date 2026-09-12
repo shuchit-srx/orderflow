@@ -1,7 +1,32 @@
 spring:
-  main:
-    banner-mode: "off"
+  application:
+    name: inventory-service
+
+  jpa:
+    open-in-view: false
+    hibernate:
+      ddl-auto: validate
+
+  flyway:
+    enabled: true
 
 security:
   internal:
-    token: test-internal-token
+    token: test-internal-service-token
+
+orderflow:
+  cache:
+    products:
+      ttl: 500ms
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include:
+          - health
+          - metrics
+
+  metrics:
+    tags:
+      application: ${spring.application.name}

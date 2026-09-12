@@ -2,12 +2,10 @@ package com.orderflow.inventory.cache;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
 import org.springframework.cache.Cache;
 import org.springframework.cache.interceptor.CacheErrorHandler;
 
-public class LoggingCacheErrorHandler
-        implements CacheErrorHandler {
+public class LoggingCacheErrorHandler implements CacheErrorHandler {
 
     private static final Logger log =
             LoggerFactory.getLogger(
@@ -21,10 +19,10 @@ public class LoggingCacheErrorHandler
             Object key
     ) {
         log.warn(
-                "Cache GET failed. cache={}, key={}",
+                "Cache GET failed cache={} key={} error={}; continuing without cache",
                 cache.getName(),
                 key,
-                exception
+                exception.getMessage()
         );
     }
 
@@ -36,10 +34,10 @@ public class LoggingCacheErrorHandler
             Object value
     ) {
         log.warn(
-                "Cache PUT failed. cache={}, key={}",
+                "Cache PUT failed cache={} key={} error={}; database result remains authoritative",
                 cache.getName(),
                 key,
-                exception
+                exception.getMessage()
         );
     }
 
@@ -50,10 +48,10 @@ public class LoggingCacheErrorHandler
             Object key
     ) {
         log.warn(
-                "Cache EVICT failed. cache={}, key={}",
+                "Cache EVICT failed cache={} key={} error={}; cached value may remain until TTL",
                 cache.getName(),
                 key,
-                exception
+                exception.getMessage()
         );
     }
 
@@ -63,9 +61,9 @@ public class LoggingCacheErrorHandler
             Cache cache
     ) {
         log.warn(
-                "Cache CLEAR failed. cache={}",
+                "Cache CLEAR failed cache={} error={}; cached values may remain until TTL",
                 cache.getName(),
-                exception
+                exception.getMessage()
         );
     }
 }
