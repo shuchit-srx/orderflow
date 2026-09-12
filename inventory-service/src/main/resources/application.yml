@@ -43,11 +43,14 @@ management:
       exposure:
         include:
           - health
+          - info
           - metrics
 
   endpoint:
     health:
       show-details: never
+      probes:
+        enabled: true
 
   metrics:
     tags:
