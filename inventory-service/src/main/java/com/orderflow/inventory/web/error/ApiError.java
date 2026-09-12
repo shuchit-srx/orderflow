@@ -1,4 +1,4 @@
-package com.orderflow.user.exception;
+package com.orderflow.inventory.web.error;
 
 import java.time.Instant;
 

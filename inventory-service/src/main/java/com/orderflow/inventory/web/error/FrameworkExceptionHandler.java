@@ -1,14 +1,14 @@
-package com.orderflow.user.exception;
+package com.orderflow.inventory.web.error;
 
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.ConstraintViolationException;
 
+import org.springframework.core.Ordered;
+import org.springframework.core.annotation.Order;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.converter.HttpMessageNotReadableException;
-import org.springframework.security.access.AccessDeniedException;
-import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.web.HttpRequestMethodNotSupportedException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.MissingRequestHeaderException;
@@ -22,46 +22,8 @@ import java.time.Instant;
 import java.util.stream.Collectors;
 
 @RestControllerAdvice
-public class GlobalExceptionHandler {
-
-    @ExceptionHandler(EmailAlreadyExistsException.class)
-    public ResponseEntity<ApiError> handleEmailAlreadyExists(
-            EmailAlreadyExistsException exception,
-            HttpServletRequest request
-    ) {
-        return buildResponse(
-                HttpStatus.CONFLICT,
-                "EMAIL_ALREADY_EXISTS",
-                exception.getMessage(),
-                request
-        );
-    }
-
-    @ExceptionHandler(BadCredentialsException.class)
-    public ResponseEntity<ApiError> handleBadCredentials(
-            BadCredentialsException exception,
-            HttpServletRequest request
-    ) {
-        return buildResponse(
-                HttpStatus.UNAUTHORIZED,
-                "INVALID_CREDENTIALS",
-                "Invalid email or password",
-                request
-        );
-    }
-
-    @ExceptionHandler(AccessDeniedException.class)
-    public ResponseEntity<ApiError> handleAccessDenied(
-            AccessDeniedException exception,
-            HttpServletRequest request
-    ) {
-        return buildResponse(
-                HttpStatus.FORBIDDEN,
-                "ACCESS_DENIED",
-                "You do not have permission to perform this operation",
-                request
-        );
-    }
+@Order(Ordered.HIGHEST_PRECEDENCE)
+public class FrameworkExceptionHandler {
 
     @ExceptionHandler(MethodArgumentNotValidException.class)
     public ResponseEntity<ApiError> handleValidation(
@@ -215,19 +177,6 @@ public class GlobalExceptionHandler {
                 HttpStatus.METHOD_NOT_ALLOWED,
                 "METHOD_NOT_ALLOWED",
                 "HTTP method is not supported for this endpoint",
-                request
-        );
-    }
-
-    @ExceptionHandler(Exception.class)
-    public ResponseEntity<ApiError> handleUnexpectedException(
-            Exception exception,
-            HttpServletRequest request
-    ) {
-        return buildResponse(
-                HttpStatus.INTERNAL_SERVER_ERROR,
-                "INTERNAL_ERROR",
-                "An unexpected error occurred",
                 request
         );
     }

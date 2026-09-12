@@ -1,67 +1,33 @@
-package com.orderflow.user.exception;
+package com.orderflow.order.web.error;
 
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.ConstraintViolationException;
 
+import org.springframework.core.Ordered;
+import org.springframework.core.annotation.Order;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.converter.HttpMessageNotReadableException;
-import org.springframework.security.access.AccessDeniedException;
-import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.web.HttpRequestMethodNotSupportedException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.MissingRequestHeaderException;
 import org.springframework.web.bind.MissingServletRequestParameterException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.client.ResourceAccessException;
+import org.springframework.web.client.RestClientResponseException;
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 import org.springframework.web.servlet.resource.NoResourceFoundException;
 
+import java.net.SocketTimeoutException;
+import java.net.http.HttpTimeoutException;
 import java.time.Instant;
 import java.util.stream.Collectors;
 
 @RestControllerAdvice
-public class GlobalExceptionHandler {
-
-    @ExceptionHandler(EmailAlreadyExistsException.class)
-    public ResponseEntity<ApiError> handleEmailAlreadyExists(
-            EmailAlreadyExistsException exception,
-            HttpServletRequest request
-    ) {
-        return buildResponse(
-                HttpStatus.CONFLICT,
-                "EMAIL_ALREADY_EXISTS",
-                exception.getMessage(),
-                request
-        );
-    }
-
-    @ExceptionHandler(BadCredentialsException.class)
-    public ResponseEntity<ApiError> handleBadCredentials(
-            BadCredentialsException exception,
-            HttpServletRequest request
-    ) {
-        return buildResponse(
-                HttpStatus.UNAUTHORIZED,
-                "INVALID_CREDENTIALS",
-                "Invalid email or password",
-                request
-        );
-    }
-
-    @ExceptionHandler(AccessDeniedException.class)
-    public ResponseEntity<ApiError> handleAccessDenied(
-            AccessDeniedException exception,
-            HttpServletRequest request
-    ) {
-        return buildResponse(
-                HttpStatus.FORBIDDEN,
-                "ACCESS_DENIED",
-                "You do not have permission to perform this operation",
-                request
-        );
-    }
+@Order(Ordered.HIGHEST_PRECEDENCE)
+public class FrameworkExceptionHandler {
 
     @ExceptionHandler(MethodArgumentNotValidException.class)
     public ResponseEntity<ApiError> handleValidation(
@@ -180,6 +146,105 @@ public class GlobalExceptionHandler {
         );
     }
 
+    @ExceptionHandler(RestClientResponseException.class)
+    public ResponseEntity<ApiError> handleInventoryResponseError(
+            RestClientResponseException exception,
+            HttpServletRequest request
+    ) {
+        int downstreamStatus =
+                exception
+                        .getStatusCode()
+                        .value();
+
+        String responseBody =
+                exception
+                        .getResponseBodyAsString();
+
+        if (downstreamStatus == HttpStatus.CONFLICT.value()) {
+
+            if (
+                    responseBody != null
+                            && responseBody.contains(
+                            "INSUFFICIENT_STOCK"
+                    )
+            ) {
+                return buildResponse(
+                        HttpStatus.CONFLICT,
+                        "INSUFFICIENT_STOCK",
+                        "Requested inventory is not available",
+                        request
+                );
+            }
+
+            return buildResponse(
+                    HttpStatus.CONFLICT,
+                    "INVENTORY_CONFLICT",
+                    "Inventory reservation conflicts with the current inventory state",
+                    request
+            );
+        }
+
+        if (downstreamStatus == HttpStatus.BAD_REQUEST.value()) {
+            return buildResponse(
+                    HttpStatus.BAD_REQUEST,
+                    "INVALID_INVENTORY_REQUEST",
+                    "Inventory rejected the reservation request",
+                    request
+            );
+        }
+
+        if (downstreamStatus == HttpStatus.NOT_FOUND.value()) {
+            return buildResponse(
+                    HttpStatus.BAD_REQUEST,
+                    "INVALID_ORDER_ITEM",
+                    "One or more requested products could not be found",
+                    request
+            );
+        }
+
+        if (
+                downstreamStatus >= 500
+                        || downstreamStatus == HttpStatus.UNAUTHORIZED.value()
+                        || downstreamStatus == HttpStatus.FORBIDDEN.value()
+        ) {
+            return buildResponse(
+                    HttpStatus.SERVICE_UNAVAILABLE,
+                    "INVENTORY_UNAVAILABLE",
+                    "Inventory service is currently unavailable",
+                    request
+            );
+        }
+
+        return buildResponse(
+                HttpStatus.BAD_GATEWAY,
+                "INVENTORY_BAD_RESPONSE",
+                "Inventory service returned an unexpected response",
+                request
+        );
+    }
+
+    @ExceptionHandler(ResourceAccessException.class)
+    public ResponseEntity<ApiError> handleInventoryConnectionError(
+            ResourceAccessException exception,
+            HttpServletRequest request
+    ) {
+        if (isTimeout(exception)) {
+            return buildResponse(
+                    HttpStatus.GATEWAY_TIMEOUT,
+                    "INVENTORY_TIMEOUT",
+                    "Inventory service did not respond within the configured timeout",
+                    request
+            );
+        }
+
+        return buildResponse(
+                HttpStatus.SERVICE_UNAVAILABLE,
+                "INVENTORY_UNAVAILABLE",
+                "Inventory service is currently unavailable",
+                request
+        );
+    }
+
     @ExceptionHandler(DataIntegrityViolationException.class)
     public ResponseEntity<ApiError> handleDataConflict(
             DataIntegrityViolationException exception,
@@ -219,17 +284,26 @@ public class GlobalExceptionHandler {
         );
     }
 
-    @ExceptionHandler(Exception.class)
-    public ResponseEntity<ApiError> handleUnexpectedException(
-            Exception exception,
-            HttpServletRequest request
+    private boolean isTimeout(
+            Throwable throwable
     ) {
-        return buildResponse(
-                HttpStatus.INTERNAL_SERVER_ERROR,
-                "INTERNAL_ERROR",
-                "An unexpected error occurred",
-                request
-        );
+        Throwable current =
+                throwable;
+
+        while (current != null) {
+
+            if (
+                    current instanceof SocketTimeoutException
+                            || current instanceof HttpTimeoutException
+            ) {
+                return true;
+            }
+
+            current =
+                    current.getCause();
+        }
+
+        return false;
     }
 
     private ResponseEntity<ApiError> buildResponse(
