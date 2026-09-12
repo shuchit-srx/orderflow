@@ -1,3 +1,6 @@
+server:
+  port: 8084
+
 spring:
   datasource:
     url: jdbc:postgresql://${NOTIFICATION_DB_HOST:localhost}:${NOTIFICATION_DB_PORT:5432}/${NOTIFICATION_DB_NAME:orderflow_notification}

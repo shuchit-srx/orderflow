@@ -2,6 +2,7 @@ package com.orderflow.order.support;
 
 import com.orderflow.order.client.InventoryClient;
 import com.orderflow.order.client.dto.InventoryProductResponse;
+import com.orderflow.order.messaging.OrderEventPublisher;
 
 import org.junit.jupiter.api.BeforeEach;
 
@@ -98,6 +99,9 @@ public abstract class AbstractIntegrationTest {
     @MockitoBean
     protected InventoryClient inventoryClient;
 
+    @MockitoBean
+    protected OrderEventPublisher orderEventPublisher;
+
     @BeforeEach
     void resetDatabase() {
 
@@ -109,7 +113,10 @@ public abstract class AbstractIntegrationTest {
                 "DELETE FROM orders"
         );
 
-        reset(inventoryClient);
+        reset(
+                inventoryClient,
+                orderEventPublisher
+        );
 
         when(
                 inventoryClient.getProduct(

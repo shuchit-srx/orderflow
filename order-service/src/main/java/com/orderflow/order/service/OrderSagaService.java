@@ -8,7 +8,8 @@ import com.orderflow.order.client.dto.ReserveInventoryRequest;
 import com.orderflow.order.dto.CreateOrderItemRequest;
 import com.orderflow.order.dto.CreateOrderRequest;
 import com.orderflow.order.dto.OrderResponse;
-
+import com.orderflow.order.messaging.OrderEventPublisher;
+import com.orderflow.order.messaging.event.OrderConfirmedEvent;
 import com.orderflow.order.exception.InventoryReservationRejectedException;
 import com.orderflow.order.exception.SagaCompensationException;
 
@@ -21,19 +22,22 @@ import java.util.UUID;
 public class OrderSagaService {
 
     private final OrderService orderService;
-
+    private final OrderEventPublisher orderEventPublisher;
     private final InventoryClient inventoryClient;
 
     public OrderSagaService(
             OrderService orderService,
-            InventoryClient inventoryClient
+            InventoryClient inventoryClient,
+            OrderEventPublisher orderEventPublisher
     ) {
-
         this.orderService =
                 orderService;
 
         this.inventoryClient =
                 inventoryClient;
+
+        this.orderEventPublisher =
+                orderEventPublisher;
     }
 
     public OrderResponse placeOrder(
@@ -74,15 +78,28 @@ public class OrderSagaService {
                             orderId
                     );
 
-            inventoryClient
-                    .confirmReservation(
+            inventoryClient.confirmReservation(
+                    orderId
+            );
+
+            OrderResponse confirmedOrder =
+                    orderService.confirmOrder(
                             orderId
                     );
 
-            return orderService
-                    .confirmOrder(
-                            orderId
+            OrderConfirmedEvent event =
+                    OrderConfirmedEvent.create(
+                            confirmedOrder.id(),
+                            customerId,
+                            confirmedOrder.totalAmount()
                     );
+
+            orderEventPublisher
+                    .publishOrderConfirmed(
+                            event
+                    );
+
+            return confirmedOrder;
 
         } catch (
                 InventoryReservationRejectedException exception
