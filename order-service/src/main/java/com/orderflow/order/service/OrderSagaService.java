@@ -7,7 +7,9 @@ import com.orderflow.order.client.dto.ReserveInventoryRequest;
 import com.orderflow.order.dto.CreateOrderItemRequest;
 import com.orderflow.order.dto.CreateOrderRequest;
 import com.orderflow.order.dto.OrderResponse;
-import com.orderflow.order.messaging.event.OrderConfirmedEvent;
+import com.orderflow.order.domain.OrderStatus;
+import com.orderflow.order.exception.IdempotencyRequestInProgressException;
+import com.orderflow.order.service.model.OrderCreationResult;
 import com.orderflow.order.exception.InventoryReservationRejectedException;
 import com.orderflow.order.exception.SagaCompensationException;
 
@@ -42,14 +44,39 @@ public class OrderSagaService {
 
     public OrderResponse placeOrder(
             UUID customerId,
+            String idempotencyKey,
             CreateOrderRequest request
-    ) {
+    ){
+
+        OrderCreationResult creationResult =
+                orderService
+                        .createOrderIdempotent(
+                                customerId,
+                                idempotencyKey,
+                                request
+                        );
 
         OrderResponse createdOrder =
-                orderService.createOrder(
-                        customerId,
-                        request
+                creationResult.order();
+
+        if (
+                !creationResult.createdNew()
+        ) {
+
+            if (
+                    createdOrder.status()
+                            == OrderStatus.CREATED
+                            || createdOrder.status()
+                            == OrderStatus.INVENTORY_RESERVED
+            ) {
+
+                throw new IdempotencyRequestInProgressException(
+                        idempotencyKey
                 );
+            }
+
+            return createdOrder;
+        }
 
         UUID orderId =
                 createdOrder.id();

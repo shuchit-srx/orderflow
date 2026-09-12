@@ -41,4 +41,12 @@ public interface OrderRepository
             @Param("orderId")
             UUID orderId
     );
+
+    @EntityGraph(
+            attributePaths = "items"
+    )
+    Optional<Order> findByCustomerIdAndIdempotencyKey(
+            UUID customerId,
+            String idempotencyKey
+    );
 }

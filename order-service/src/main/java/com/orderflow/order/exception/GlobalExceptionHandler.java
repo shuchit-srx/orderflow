@@ -197,6 +197,58 @@ public class GlobalExceptionHandler {
         );
     }
 
+    @ExceptionHandler(
+            InvalidIdempotencyKeyException.class
+    )
+    public ResponseEntity<ApiError>
+    handleInvalidIdempotencyKey(
+            InvalidIdempotencyKeyException exception,
+            HttpServletRequest request
+    ) {
+
+        return buildResponse(
+                HttpStatus.BAD_REQUEST,
+                "INVALID_IDEMPOTENCY_KEY",
+                exception.getMessage(),
+                request.getRequestURI()
+        );
+    }
+
+    @ExceptionHandler(
+            IdempotencyKeyConflictException.class
+    )
+    public ResponseEntity<ApiError>
+    handleIdempotencyConflict(
+            IdempotencyKeyConflictException exception,
+            HttpServletRequest request
+    ) {
+
+        return buildResponse(
+                HttpStatus.CONFLICT,
+                "IDEMPOTENCY_KEY_CONFLICT",
+                exception.getMessage(),
+                request.getRequestURI()
+        );
+    }
+
+    @ExceptionHandler(
+            IdempotencyRequestInProgressException.class
+    )
+    public ResponseEntity<ApiError>
+    handleIdempotencyInProgress(
+            IdempotencyRequestInProgressException exception,
+            HttpServletRequest request
+    ) {
+
+        return buildResponse(
+                HttpStatus.CONFLICT,
+                "IDEMPOTENCY_REQUEST_IN_PROGRESS",
+                exception.getMessage(),
+                request.getRequestURI()
+        );
+    }
+
+
     private ResponseEntity<ApiError> buildResponse(
             HttpStatus status,
             String error,

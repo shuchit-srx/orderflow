@@ -43,6 +43,8 @@ class OrderSagaServiceIntegrationTest
                 orderSagaService
                         .placeOrder(
                                 CUSTOMER_1,
+                                UUID.randomUUID()
+                                        .toString(),
                                 request()
                         );
 
@@ -117,6 +119,8 @@ class OrderSagaServiceIntegrationTest
                         orderSagaService
                                 .placeOrder(
                                         CUSTOMER_1,
+                                        UUID.randomUUID()
+                                                .toString(),
                                         request()
                                 )
         )
@@ -163,6 +167,8 @@ class OrderSagaServiceIntegrationTest
                         orderSagaService
                                 .placeOrder(
                                         CUSTOMER_1,
+                                        UUID.randomUUID()
+                                                .toString(),
                                         request()
                                 )
         )

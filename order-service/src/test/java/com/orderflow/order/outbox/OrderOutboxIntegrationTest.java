@@ -17,6 +17,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 
 import java.util.List;
+import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -38,6 +39,7 @@ class OrderOutboxIntegrationTest
                 orderSagaService
                         .placeOrder(
                                 CUSTOMER_1,
+                                UUID.randomUUID().toString(),
                                 request()
                         );
 

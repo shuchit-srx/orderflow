@@ -30,11 +30,15 @@ public class OrderPersistenceService {
     @Transactional
     public OrderResponse create(
             UUID customerId,
+            String idempotencyKey,
+            String requestHash,
             List<ResolvedOrderItem> items
     ) {
 
         Order order =
-                new Order(customerId);
+                new Order(customerId,
+                        idempotencyKey,
+                        requestHash);
 
         for (ResolvedOrderItem item : items) {
 
@@ -53,5 +57,44 @@ public class OrderPersistenceService {
                 );
 
         return OrderResponse.from(saved);
+    }
+
+    @Transactional
+    public OrderResponse createIdempotent(
+            UUID customerId,
+            String idempotencyKey,
+            String requestHash,
+            List<ResolvedOrderItem> resolvedItems
+    ) {
+
+        Order order =
+                new Order(
+                        customerId,
+                        idempotencyKey,
+                        requestHash
+                );
+
+        for (
+                ResolvedOrderItem item :
+                resolvedItems
+        ) {
+
+            order.addItem(
+                    item.productId(),
+                    item.sku(),
+                    item.productName(),
+                    item.unitPrice(),
+                    item.quantity()
+            );
+        }
+
+        Order saved =
+                orderRepository.saveAndFlush(
+                        order
+                );
+
+        return OrderResponse.from(
+                saved
+        );
     }
 }

@@ -66,13 +66,59 @@ public class Order {
     )
     private Instant updatedAt;
 
+    @Column(
+            name = "idempotency_key",
+            length = 200
+    )
+    private String idempotencyKey;
+
+    @Column(
+            name = "request_hash",
+            length = 64
+    )
+    private String requestHash;
+
     protected Order() {
     }
 
-    public Order(UUID customerId) {
-        this.customerId = customerId;
-        this.status = OrderStatus.CREATED;
-        this.totalAmount = BigDecimal.ZERO;
+    public Order(
+            UUID customerId
+    ) {
+        this(
+                customerId,
+                null,
+                null
+        );
+    }
+
+    public Order(
+            UUID customerId,
+            String idempotencyKey,
+            String requestHash
+    ) {
+
+        this.customerId =
+                customerId;
+
+        this.status =
+                OrderStatus.CREATED;
+
+        this.totalAmount =
+                BigDecimal.ZERO;
+
+        this.idempotencyKey =
+                idempotencyKey;
+
+        this.requestHash =
+                requestHash;
+    }
+
+    public String getIdempotencyKey() {
+        return idempotencyKey;
+    }
+
+    public String getRequestHash() {
+        return requestHash;
     }
 
     public void addItem(

@@ -74,7 +74,11 @@ class OrderApiIntegrationTest
 
         mockMvc.perform(
                         post("/api/v1/orders")
-
+                                .header(
+                                        "Idempotency-Key",
+                                        UUID.randomUUID()
+                                                .toString()
+                                )
                                 .with(
                                         jwt()
                                                 .jwt(
@@ -131,7 +135,11 @@ class OrderApiIntegrationTest
 
         mockMvc.perform(
                         post("/api/v1/orders")
-
+                                .header(
+                                        "Idempotency-Key",
+                                        UUID.randomUUID()
+                                                .toString()
+                                )
                                 .with(
                                         jwt()
                                                 .jwt(
@@ -352,7 +360,11 @@ class OrderApiIntegrationTest
 
         mockMvc.perform(
                         post("/api/v1/orders")
-
+                                .header(
+                                        "Idempotency-Key",
+                                        UUID.randomUUID()
+                                                .toString()
+                                )
                                 .with(
                                         customerJwt(
                                                 CUSTOMER_1
@@ -378,6 +390,46 @@ class OrderApiIntegrationTest
                         jsonPath("$.error")
                                 .value(
                                         "VALIDATION_ERROR"
+                                )
+                );
+    }
+
+    @Test
+    void missingIdempotencyKeyShouldReturn400()
+            throws Exception {
+
+        mockMvc.perform(
+                        post("/api/v1/orders")
+                                .with(
+                                        customerJwt(
+                                                CUSTOMER_1
+                                        )
+                                )
+                                .contentType(
+                                        MediaType.APPLICATION_JSON
+                                )
+                                .content(
+                                        """
+                                        {
+                                          "items":[
+                                            {
+                                              "productId":
+                                                "11111111-1111-1111-1111-111111111111",
+                                              "quantity":1
+                                            }
+                                          ]
+                                        }
+                                        """
+                                )
+                )
+                .andExpect(
+                        status()
+                                .isBadRequest()
+                )
+                .andExpect(
+                        jsonPath("$.error")
+                                .value(
+                                        "INVALID_IDEMPOTENCY_KEY"
                                 )
                 );
     }
