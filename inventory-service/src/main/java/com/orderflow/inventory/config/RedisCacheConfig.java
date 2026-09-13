@@ -3,7 +3,7 @@ package com.orderflow.inventory.config;
 import com.orderflow.inventory.cache.CacheNames;
 import com.orderflow.inventory.cache.LoggingCacheErrorHandler;
 import com.orderflow.inventory.dto.product.ProductResponse;
-
+import org.springframework.data.redis.cache.RedisCacheWriter;
 import org.springframework.beans.factory.annotation.Value;
 
 import org.springframework.cache.annotation.CachingConfigurer;
@@ -92,10 +92,14 @@ public class RedisCacheConfig implements CachingConfigurer {
                         .serializeValuesWith(
                                 productValueSerialization
                         );
+        RedisCacheWriter cacheWriter = RedisCacheWriter.create(
+                connectionFactory,
+                configurer -> configurer.immediateWrites()
+        );
 
         return RedisCacheManager
                 .builder(
-                        connectionFactory
+                        cacheWriter
                 )
                 .cacheDefaults(
                         defaultConfiguration
