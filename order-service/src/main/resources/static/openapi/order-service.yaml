@@ -1,0 +1,462 @@
+openapi: 3.0.3
+
+info:
+  title: OrderFlow Order Service API
+  version: 1.0.0
+  description: |
+    Order creation, retrieval and order-state APIs.
+
+    Customer APIs use JWT authentication.
+
+    POST /api/v1/orders supports request idempotency through
+    the Idempotency-Key header.
+
+    Idempotency behavior:
+
+    - same customer + same key + same payload returns the previous result
+    - same customer + same key + different payload returns HTTP 409
+    - inventory must not be reserved twice for an idempotent replay
+
+servers:
+  - url: http://localhost:8083
+    description: Local Order Service
+
+tags:
+  - name: Customer Orders
+  - name: Admin Orders
+  - name: Internal Orders
+
+paths:
+  /api/v1/orders:
+    post:
+      tags:
+        - Customer Orders
+      summary: Create an order
+      description: |
+        CUSTOMER only.
+
+        The Idempotency-Key header protects against duplicate
+        order creation caused by client retries or network failures.
+      operationId: createOrder
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: Idempotency-Key
+          in: header
+          required: true
+          description: Client-generated idempotency key
+          schema:
+            type: string
+            minLength: 1
+            maxLength: 255
+          example: 83c20a9e-bfb2-41ce-a6aa-df2e9870f145
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateOrderRequest'
+            example:
+              items:
+                - productId: 11111111-1111-1111-1111-111111111111
+                  quantity: 2
+      responses:
+        '201':
+          description: Order created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OrderResponse'
+              example:
+                id: 90000000-0000-0000-0000-000000000001
+                customerId: 80000000-0000-0000-0000-000000000001
+                status: CONFIRMED
+                totalAmount: 139998.00
+                currency: INR
+
+        '400':
+          $ref: '#/components/responses/ValidationError'
+
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+        '409':
+          description: |
+            Conflict.
+
+            Possible reasons include insufficient inventory or
+            reuse of the same Idempotency-Key with a different payload.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+              examples:
+                idempotencyConflict:
+                  value:
+                    timestamp: '2026-09-13T00:00:00Z'
+                    status: 409
+                    error: IDEMPOTENCY_KEY_CONFLICT
+                    message: Idempotency key was already used with a different request
+                    path: /api/v1/orders
+                    requestId: request-123
+
+                insufficientStock:
+                  value:
+                    timestamp: '2026-09-13T00:00:00Z'
+                    status: 409
+                    error: INSUFFICIENT_STOCK
+                    message: Requested quantity is not available
+                    path: /api/v1/orders
+                    requestId: request-123
+
+        '503':
+          description: Inventory Service unavailable
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+
+        '504':
+          description: Inventory Service timed out
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+
+    get:
+      tags:
+        - Customer Orders
+      summary: List orders for the authenticated customer
+      description: Customer identity is derived from the JWT.
+      operationId: listCustomerOrders
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Customer orders
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/OrderResponse'
+
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+  /api/v1/orders/{orderId}:
+    get:
+      tags:
+        - Customer Orders
+      summary: Get one customer order
+      description: |
+        Customers may read only their own orders.
+
+        A request for another customer's order returns 404 to avoid
+        leaking whether that order exists.
+      operationId: getOrder
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: orderId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Order found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OrderResponse'
+
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+        '404':
+          description: Order not found or not owned by authenticated customer
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+              example:
+                timestamp: '2026-09-13T00:00:00Z'
+                status: 404
+                error: ORDER_NOT_FOUND
+                message: Order not found
+                path: /api/v1/orders/90000000-0000-0000-0000-000000000001
+                requestId: request-123
+
+  /api/v1/orders/{orderId}/cancel:
+    post:
+      tags:
+        - Customer Orders
+      summary: Cancel an eligible order
+      operationId: cancelOrder
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: orderId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Order cancelled
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OrderResponse'
+
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+        '409':
+          description: Order can no longer be cancelled
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+              example:
+                timestamp: '2026-09-13T00:00:00Z'
+                status: 409
+                error: CANCELLATION_NOT_ALLOWED
+                message: Order cannot be cancelled from its current state
+                path: /api/v1/orders/90000000-0000-0000-0000-000000000001/cancel
+                requestId: request-123
+
+  /api/v1/admin/orders:
+    get:
+      tags:
+        - Admin Orders
+      summary: List orders as an administrator
+      operationId: listAdminOrders
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Orders
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/OrderResponse'
+
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+  /api/v1/admin/orders/{orderId}/status:
+    patch:
+      tags:
+        - Admin Orders
+      summary: Update an order fulfillment status
+      description: ADMIN only. Invalid state transitions return HTTP 409.
+      operationId: updateOrderStatus
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: orderId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateOrderStatusRequest'
+            example:
+              status: PROCESSING
+      responses:
+        '200':
+          description: Order status updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OrderResponse'
+
+        '400':
+          $ref: '#/components/responses/ValidationError'
+
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+        '409':
+          description: Invalid state transition
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+              example:
+                timestamp: '2026-09-13T00:00:00Z'
+                status: 409
+                error: INVALID_ORDER_STATE
+                message: Requested order state transition is not allowed
+                path: /api/v1/admin/orders/90000000-0000-0000-0000-000000000001/status
+                requestId: request-123
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: JWT issued by the User Service
+
+  schemas:
+    CreateOrderRequest:
+      type: object
+      required:
+        - items
+      properties:
+        items:
+          type: array
+          minItems: 1
+          items:
+            $ref: '#/components/schemas/CreateOrderItemRequest'
+
+    CreateOrderItemRequest:
+      type: object
+      required:
+        - productId
+        - quantity
+      properties:
+        productId:
+          type: string
+          format: uuid
+        quantity:
+          type: integer
+          minimum: 1
+
+    UpdateOrderStatusRequest:
+      type: object
+      required:
+        - status
+      properties:
+        status:
+          type: string
+          enum:
+            - CREATED
+            - PENDING
+            - CONFIRMED
+            - PROCESSING
+            - SHIPPED
+            - DELIVERED
+            - CANCELLED
+            - FAILED
+
+    OrderItemResponse:
+      type: object
+      properties:
+        productId:
+          type: string
+          format: uuid
+        sku:
+          type: string
+        productName:
+          type: string
+        unitPrice:
+          type: number
+        quantity:
+          type: integer
+        lineTotal:
+          type: number
+
+    OrderResponse:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        customerId:
+          type: string
+          format: uuid
+        status:
+          type: string
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/OrderItemResponse'
+        totalAmount:
+          type: number
+        currency:
+          type: string
+          example: INR
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+
+    ApiError:
+      type: object
+      properties:
+        timestamp:
+          type: string
+          format: date-time
+        status:
+          type: integer
+        error:
+          type: string
+        message:
+          type: string
+        path:
+          type: string
+        requestId:
+          type: string
+          nullable: true
+
+  responses:
+    ValidationError:
+      description: Request validation failed
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ApiError'
+
+    Unauthorized:
+      description: Authentication required
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ApiError'
+
+    Forbidden:
+      description: Authenticated principal does not have the required role
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ApiError'
+
+    NotFound:
+      description: Order not found
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ApiError'

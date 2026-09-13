@@ -1,0 +1,604 @@
+openapi: 3.0.3
+
+info:
+  title: OrderFlow Inventory Service API
+  version: 1.0.0
+  description: |
+    Product, inventory and reservation APIs.
+
+    Admin product and inventory mutations use JWT authentication.
+
+    Internal inventory reservation commands use X-Internal-Service-Token.
+
+    Reservation operations are idempotent for the same order.
+
+servers:
+  - url: http://localhost:8082
+    description: Local Inventory Service
+
+tags:
+  - name: Products
+  - name: Inventory
+  - name: Internal Inventory
+
+paths:
+  /api/v1/products:
+    get:
+      tags:
+        - Products
+      summary: List active products
+      operationId: listProducts
+      parameters:
+        - name: page
+          in: query
+          schema:
+            type: integer
+            default: 0
+            minimum: 0
+
+        - name: size
+          in: query
+          schema:
+            type: integer
+            default: 20
+            minimum: 1
+
+        - name: sort
+          in: query
+          example: price,asc
+          schema:
+            type: string
+
+        - name: name
+          in: query
+          schema:
+            type: string
+
+        - name: minPrice
+          in: query
+          schema:
+            type: number
+
+        - name: maxPrice
+          in: query
+          schema:
+            type: number
+
+      responses:
+        '200':
+          description: Paginated products
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProductPageResponse'
+
+    post:
+      tags:
+        - Products
+      summary: Create a product
+      operationId: createProduct
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateProductRequest'
+            example:
+              sku: SKU-1001
+              name: Mechanical Keyboard
+              description: Wireless mechanical keyboard
+              price: 3999.00
+              initialStock: 100
+      responses:
+        '201':
+          description: Product created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProductResponse'
+
+        '400':
+          $ref: '#/components/responses/ValidationError'
+
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+        '409':
+          description: Duplicate SKU
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+
+  /api/v1/products/{productId}:
+    parameters:
+      - name: productId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+
+    get:
+      tags:
+        - Products
+      summary: Get a product
+      operationId: getProduct
+      responses:
+        '200':
+          description: Product found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProductResponse'
+
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+    put:
+      tags:
+        - Products
+      summary: Update a product
+      operationId: updateProduct
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateProductRequest'
+            example:
+              name: Mechanical Keyboard Pro
+              description: Updated description
+              price: 4499.00
+      responses:
+        '200':
+          description: Product updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProductResponse'
+
+        '400':
+          $ref: '#/components/responses/ValidationError'
+
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+    delete:
+      tags:
+        - Products
+      summary: Deactivate a product
+      description: Performs logical product deactivation.
+      operationId: deactivateProduct
+      security:
+        - bearerAuth: []
+      responses:
+        '204':
+          description: Product deactivated
+
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /api/v1/inventory/{productId}:
+    get:
+      tags:
+        - Inventory
+      summary: Get inventory for a product
+      operationId: getInventory
+      parameters:
+        - name: productId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Inventory state
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/InventoryResponse'
+
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /api/v1/admin/inventory/{productId}/adjust:
+    post:
+      tags:
+        - Inventory
+      summary: Adjust product inventory
+      description: |
+        ADMIN only.
+
+        Positive delta increases available inventory.
+        Negative delta decreases inventory only when inventory invariants remain valid.
+      operationId: adjustInventory
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: productId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/InventoryAdjustmentRequest'
+            example:
+              delta: 20
+              reason: WAREHOUSE_RESTOCK
+      responses:
+        '200':
+          description: Inventory adjusted
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/InventoryResponse'
+
+        '400':
+          $ref: '#/components/responses/ValidationError'
+
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+  /api/v1/internal/inventory/reservations:
+    post:
+      tags:
+        - Internal Inventory
+      summary: Reserve inventory for an order
+      description: |
+        Internal Order Service endpoint.
+
+        X-Internal-Service-Token is required.
+
+        The orderId acts as the idempotency identity for a reservation.
+        Retrying the same reservation must not reserve inventory twice.
+      operationId: reserveInventory
+      security:
+        - internalServiceToken: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateReservationRequest'
+            example:
+              orderId: 82000000-0000-0000-0000-000000000001
+              items:
+                - productId: 11111111-1111-1111-1111-111111111111
+                  quantity: 2
+      responses:
+        '200':
+          description: Idempotent replay of an existing reservation
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReservationResponse'
+
+        '201':
+          description: Reservation created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReservationResponse'
+              example:
+                reservationId: c0dba4b8-4107-4466-9820-ed5b653477ac
+                orderId: 82000000-0000-0000-0000-000000000001
+                status: ACTIVE
+                expiresAt: '2026-09-13T01:30:00Z'
+                items:
+                  - productId: 11111111-1111-1111-1111-111111111111
+                    quantity: 2
+
+        '400':
+          $ref: '#/components/responses/ValidationError'
+
+        '401':
+          description: Invalid internal service token
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/InternalServiceError'
+              example:
+                error: INVALID_INTERNAL_SERVICE_TOKEN
+                message: Internal service authentication failed
+
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+        '409':
+          description: Insufficient inventory or conflicting replay
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+              example:
+                timestamp: '2026-09-13T00:00:00Z'
+                status: 409
+                error: INSUFFICIENT_STOCK
+                message: Requested quantity is not available
+                path: /api/v1/internal/inventory/reservations
+                requestId: request-123
+
+  /api/v1/internal/inventory/reservations/{orderId}/confirm:
+    post:
+      tags:
+        - Internal Inventory
+      summary: Confirm an inventory reservation
+      operationId: confirmReservation
+      security:
+        - internalServiceToken: []
+      parameters:
+        - name: orderId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Reservation confirmed or already confirmed
+
+        '401':
+          description: Invalid internal service token
+
+        '404':
+          description: Reservation not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+
+  /api/v1/internal/inventory/reservations/{orderId}/release:
+    post:
+      tags:
+        - Internal Inventory
+      summary: Release an inventory reservation
+      operationId: releaseReservation
+      security:
+        - internalServiceToken: []
+      parameters:
+        - name: orderId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Reservation released or already released
+
+        '401':
+          description: Invalid internal service token
+
+        '404':
+          description: Reservation not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+    internalServiceToken:
+      type: apiKey
+      in: header
+      name: X-Internal-Service-Token
+
+  schemas:
+    CreateProductRequest:
+      type: object
+      required:
+        - sku
+        - name
+        - price
+        - initialStock
+      properties:
+        sku:
+          type: string
+        name:
+          type: string
+        description:
+          type: string
+        price:
+          type: number
+          format: decimal
+        initialStock:
+          type: integer
+          minimum: 0
+
+    UpdateProductRequest:
+      type: object
+      properties:
+        name:
+          type: string
+        description:
+          type: string
+        price:
+          type: number
+          format: decimal
+
+    ProductResponse:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        sku:
+          type: string
+        name:
+          type: string
+        description:
+          type: string
+        price:
+          type: number
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+
+    ProductPageResponse:
+      type: object
+      additionalProperties: true
+
+    InventoryResponse:
+      type: object
+      properties:
+        productId:
+          type: string
+          format: uuid
+        availableQuantity:
+          type: integer
+        reservedQuantity:
+          type: integer
+
+    InventoryAdjustmentRequest:
+      type: object
+      required:
+        - delta
+      properties:
+        delta:
+          type: integer
+        reason:
+          type: string
+
+    CreateReservationRequest:
+      type: object
+      required:
+        - orderId
+        - items
+      properties:
+        orderId:
+          type: string
+          format: uuid
+        items:
+          type: array
+          minItems: 1
+          items:
+            $ref: '#/components/schemas/ReservationItem'
+
+    ReservationItem:
+      type: object
+      required:
+        - productId
+        - quantity
+      properties:
+        productId:
+          type: string
+          format: uuid
+        quantity:
+          type: integer
+          minimum: 1
+
+    ReservationResponse:
+      type: object
+      properties:
+        reservationId:
+          type: string
+          format: uuid
+        orderId:
+          type: string
+          format: uuid
+        status:
+          type: string
+          enum:
+            - ACTIVE
+            - CONFIRMED
+            - RELEASED
+            - EXPIRED
+        expiresAt:
+          type: string
+          format: date-time
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/ReservationItem'
+
+    InternalServiceError:
+      type: object
+      properties:
+        error:
+          type: string
+        message:
+          type: string
+
+    ApiError:
+      type: object
+      properties:
+        timestamp:
+          type: string
+          format: date-time
+        status:
+          type: integer
+        error:
+          type: string
+        message:
+          type: string
+        path:
+          type: string
+        requestId:
+          type: string
+          nullable: true
+
+  responses:
+    ValidationError:
+      description: Request validation failed
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ApiError'
+
+    Unauthorized:
+      description: Authentication required
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ApiError'
+
+    Forbidden:
+      description: Authenticated principal does not have the required role
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ApiError'
+
+    NotFound:
+      description: Resource not found
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ApiError'

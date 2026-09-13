@@ -55,3 +55,15 @@ management:
   metrics:
     tags:
       application: ${spring.application.name}
+
+springdoc:
+  api-docs:
+    enabled: false
+
+  swagger-ui:
+    path: /swagger-ui.html
+    url: /openapi/inventory-service.yaml
+    display-request-duration: true
+    operations-sorter: method
+    tags-sorter: alpha
+    persist-authorization: true

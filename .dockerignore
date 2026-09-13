@@ -1,0 +1,16 @@
+.git
+.github
+.idea
+.vscode
+.DS_Store
+.env
+**/target
+**/*.log
+**/.classpath
+**/.project
+**/.settings
+**/surefire-reports
+**/*.iml
+README*.md
+docs
+performance

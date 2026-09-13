@@ -1,0 +1,85 @@
+name: OrderFlow CI
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: orderflow-ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  maven-quality-gate:
+    name: Maven Quality Gate
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v7
+
+      - name: Set up Java 21
+        uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: "21"
+          cache: maven
+          cache-dependency-path: "**/pom.xml"
+
+      - name: Show tool versions
+        run: |
+          java --version
+          mvn --version
+          docker --version
+          docker compose version
+
+      - name: Compile all services
+        run: |
+          mvn \
+            --batch-mode \
+            --no-transfer-progress \
+            -DskipTests \
+            clean compile
+
+      - name: Run unit and integration tests
+        run: |
+          mvn \
+            --batch-mode \
+            --no-transfer-progress \
+            test
+
+      - name: Package all services
+        run: |
+          mvn \
+            --batch-mode \
+            --no-transfer-progress \
+            -DskipTests \
+            package
+
+  docker-build:
+    name: Docker Build
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    needs:
+      - maven-quality-gate
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v7
+
+      - name: Show Docker versions
+        run: |
+          docker --version
+          docker compose version
+
+      - name: Validate Docker Compose
+        run: |
+          docker compose config --quiet
+
+      - name: Build all Docker images
+        run: |
+          docker compose build

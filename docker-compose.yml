@@ -1,53 +1,315 @@
 services:
+
   postgres:
-    image: postgres:17-alpine
+    image: postgres:17.11-alpine
     container_name: orderflow-postgres
+    restart: unless-stopped
+
     environment:
       POSTGRES_USER: ${POSTGRES_USER:-orderflow}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-orderflow}
       POSTGRES_DB: postgres
+      USER_DB_NAME: ${USER_DB_NAME:-orderflow_user}
+      INVENTORY_DB_NAME: ${INVENTORY_DB_NAME:-orderflow_inventory}
+      ORDER_DB_NAME: ${ORDER_DB_NAME:-orderflow_order}
+      NOTIFICATION_DB_NAME: ${NOTIFICATION_DB_NAME:-orderflow_notification}
+
     ports:
       - "${POSTGRES_PORT:-5432}:5432"
+
     volumes:
-      - orderflow-postgres-data:/var/lib/postgresql/data
-      - ./infrastructure/docker/postgres/init:/docker-entrypoint-initdb.d:ro
+      - postgres-data:/var/lib/postgresql/data
+      - ./infrastructure/docker/postgres/init-databases.sh:/docker-entrypoint-initdb.d/10-init-databases.sh:ro
+
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-orderflow} -d postgres"]
+      test:
+        [
+          "CMD-SHELL",
+          "pg_isready -U ${POSTGRES_USER:-orderflow} -d postgres"
+        ]
       interval: 5s
       timeout: 5s
       retries: 10
+      start_period: 10s
+
+    networks:
+      - orderflow-network
+
 
   redis:
-    image: redis:8-alpine
+    image: redis:8.8.2-alpine
     container_name: orderflow-redis
+    restart: unless-stopped
+
+    command:
+      [
+        "redis-server",
+        "--appendonly",
+        "yes"
+      ]
+
     ports:
       - "${REDIS_PORT:-6379}:6379"
+
     volumes:
-      - orderflow-redis-data:/data
+      - redis-data:/data
+
     healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
+      test:
+        [
+          "CMD",
+          "redis-cli",
+          "ping"
+        ]
       interval: 5s
       timeout: 3s
       retries: 10
+      start_period: 5s
+
+    networks:
+      - orderflow-network
+
 
   rabbitmq:
-    image: rabbitmq:4-management-alpine
+    image: rabbitmq:4.3.5-management-alpine
     container_name: orderflow-rabbitmq
+    restart: unless-stopped
+
     environment:
       RABBITMQ_DEFAULT_USER: ${RABBITMQ_USERNAME:-orderflow}
       RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASSWORD:-orderflow}
+
     ports:
       - "${RABBITMQ_PORT:-5672}:5672"
       - "${RABBITMQ_MANAGEMENT_PORT:-15672}:15672"
+
     volumes:
-      - orderflow-rabbitmq-data:/var/lib/rabbitmq
+      - rabbitmq-data:/var/lib/rabbitmq
+
     healthcheck:
-      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
+      test:
+        [
+          "CMD",
+          "rabbitmq-diagnostics",
+          "-q",
+          "ping"
+        ]
       interval: 10s
       timeout: 5s
       retries: 10
+      start_period: 15s
+
+    networks:
+      - orderflow-network
+
+
+  user-service:
+    build:
+      context: .
+      dockerfile: user-service/Dockerfile
+
+    image: orderflow/user-service:local
+    container_name: orderflow-user-service
+    restart: unless-stopped
+
+    environment:
+      SPRING_PROFILES_ACTIVE: ${SPRING_PROFILES_ACTIVE:-local}
+
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/${USER_DB_NAME:-orderflow_user}
+      SPRING_DATASOURCE_USERNAME: ${POSTGRES_USER:-orderflow}
+      SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD:-orderflow}
+
+      SECURITY_JWT_PRIVATE_KEY_LOCATION: file:/run/secrets/jwt/private.pem
+      SECURITY_JWT_PUBLIC_KEY_LOCATION: file:/run/secrets/jwt/public.pem
+      SECURITY_JWT_ISSUER: ${JWT_ISSUER:-orderflow-user-service}
+
+    volumes:
+      - ${JWT_PRIVATE_KEY_HOST_PATH:-./user-service/src/main/resources/keys/private.pem}:/run/secrets/jwt/private.pem:ro
+      - ${JWT_PUBLIC_KEY_HOST_PATH:-./user-service/src/main/resources/keys/public.pem}:/run/secrets/jwt/public.pem:ro
+
+    ports:
+      - "${USER_SERVICE_PORT:-8081}:8081"
+
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+    networks:
+      - orderflow-network
+
+
+  inventory-service:
+    build:
+      context: .
+      dockerfile: inventory-service/Dockerfile
+
+    image: orderflow/inventory-service:local
+    container_name: orderflow-inventory-service
+    restart: unless-stopped
+
+    environment:
+      SPRING_PROFILES_ACTIVE: ${SPRING_PROFILES_ACTIVE:-local}
+
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/${INVENTORY_DB_NAME:-orderflow_inventory}
+      SPRING_DATASOURCE_USERNAME: ${POSTGRES_USER:-orderflow}
+      SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD:-orderflow}
+
+      SPRING_DATA_REDIS_HOST: redis
+      SPRING_DATA_REDIS_PORT: 6379
+
+      SECURITY_JWT_PUBLIC_KEY_LOCATION: file:/run/secrets/jwt/public.pem
+      SECURITY_JWT_ISSUER: ${JWT_ISSUER:-orderflow-user-service}
+
+      SECURITY_INTERNAL_TOKEN: ${INTERNAL_SERVICE_TOKEN:-local-internal-service-token}
+
+    volumes:
+      - ${JWT_PUBLIC_KEY_HOST_PATH:-./user-service/src/main/resources/keys/public.pem}:/run/secrets/jwt/public.pem:ro
+
+    ports:
+      - "${INVENTORY_SERVICE_PORT:-8082}:8082"
+
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+    networks:
+      - orderflow-network
+
+
+  order-service:
+    build:
+      context: .
+      dockerfile: order-service/Dockerfile
+
+    image: orderflow/order-service:local
+    container_name: orderflow-order-service
+    restart: unless-stopped
+
+    environment:
+      SPRING_PROFILES_ACTIVE: ${SPRING_PROFILES_ACTIVE:-local}
+
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/${ORDER_DB_NAME:-orderflow_order}
+      SPRING_DATASOURCE_USERNAME: ${POSTGRES_USER:-orderflow}
+      SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD:-orderflow}
+
+      SPRING_RABBITMQ_HOST: rabbitmq
+      SPRING_RABBITMQ_PORT: 5672
+      SPRING_RABBITMQ_USERNAME: ${RABBITMQ_USERNAME:-orderflow}
+      SPRING_RABBITMQ_PASSWORD: ${RABBITMQ_PASSWORD:-orderflow}
+
+      SECURITY_JWT_PUBLIC_KEY_LOCATION: file:/run/secrets/jwt/public.pem
+      SECURITY_JWT_ISSUER: ${JWT_ISSUER:-orderflow-user-service}
+
+      SECURITY_INTERNAL_TOKEN: ${INTERNAL_SERVICE_TOKEN:-local-internal-service-token}
+
+      INVENTORY_SERVICE_BASE_URL: http://inventory-service:8082
+      INVENTORY_SERVICE_URL: http://inventory-service:8082
+      SERVICES_INVENTORY_BASE_URL: http://inventory-service:8082
+
+    volumes:
+      - ${JWT_PUBLIC_KEY_HOST_PATH:-./user-service/src/main/resources/keys/public.pem}:/run/secrets/jwt/public.pem:ro
+
+    ports:
+      - "${ORDER_SERVICE_PORT:-8083}:8083"
+
+    depends_on:
+      postgres:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+      inventory-service:
+        condition: service_healthy
+
+    networks:
+      - orderflow-network
+
+
+  notification-service:
+    build:
+      context: .
+      dockerfile: notification-service/Dockerfile
+
+    image: orderflow/notification-service:local
+    container_name: orderflow-notification-service
+    restart: unless-stopped
+
+    environment:
+      SPRING_PROFILES_ACTIVE: ${SPRING_PROFILES_ACTIVE:-local}
+
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/${NOTIFICATION_DB_NAME:-orderflow_notification}
+      SPRING_DATASOURCE_USERNAME: ${POSTGRES_USER:-orderflow}
+      SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD:-orderflow}
+
+      SPRING_RABBITMQ_HOST: rabbitmq
+      SPRING_RABBITMQ_PORT: 5672
+      SPRING_RABBITMQ_USERNAME: ${RABBITMQ_USERNAME:-orderflow}
+      SPRING_RABBITMQ_PASSWORD: ${RABBITMQ_PASSWORD:-orderflow}
+
+    ports:
+      - "${NOTIFICATION_SERVICE_PORT:-8084}:8084"
+
+    depends_on:
+      postgres:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+
+    networks:
+      - orderflow-network
+
+
+  api-gateway:
+    build:
+      context: .
+      dockerfile: api-gateway/Dockerfile
+
+    image: orderflow/api-gateway:local
+    container_name: orderflow-api-gateway
+    restart: unless-stopped
+
+    environment:
+      SPRING_PROFILES_ACTIVE: ${SPRING_PROFILES_ACTIVE:-local},docker
+
+      SPRING_DATA_REDIS_HOST: redis
+      SPRING_DATA_REDIS_PORT: 6379
+
+      SECURITY_JWT_PUBLIC_KEY_LOCATION: file:/run/secrets/jwt/public.pem
+      SECURITY_JWT_ISSUER: ${JWT_ISSUER:-orderflow-user-service}
+
+    volumes:
+      - ${JWT_PUBLIC_KEY_HOST_PATH:-./user-service/src/main/resources/keys/public.pem}:/run/secrets/jwt/public.pem:ro
+
+    ports:
+      - "${API_GATEWAY_PORT:-8080}:8080"
+
+    depends_on:
+      user-service:
+        condition: service_healthy
+      inventory-service:
+        condition: service_healthy
+      order-service:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+    networks:
+      - orderflow-network
+
+
+networks:
+  orderflow-network:
+    name: orderflow-network
+    driver: bridge
+
 
 volumes:
-  orderflow-postgres-data:
-  orderflow-redis-data:
-  orderflow-rabbitmq-data:
+  postgres-data:
+    name: orderflow-postgres-data
+
+  redis-data:
+    name: orderflow-redis-data
+
+  rabbitmq-data:
+    name: orderflow-rabbitmq-data

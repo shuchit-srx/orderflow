@@ -40,3 +40,15 @@ security:
     access-token-ttl-seconds: 3600
     private-key-location: file:./keys/private.pem
     public-key-location: file:./keys/public.pem
+
+springdoc:
+  api-docs:
+    enabled: false
+
+  swagger-ui:
+    path: /swagger-ui.html
+    url: /openapi/user-service.yaml
+    display-request-duration: true
+    operations-sorter: method
+    tags-sorter: alpha
+    persist-authorization: true

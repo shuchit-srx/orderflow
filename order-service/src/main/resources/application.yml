@@ -29,3 +29,15 @@ info:
   app:
     name: order-service
     version: 0.0.1-SNAPSHOT
+
+springdoc:
+  api-docs:
+    enabled: false
+
+  swagger-ui:
+    path: /swagger-ui.html
+    url: /openapi/order-service.yaml
+    display-request-duration: true
+    operations-sorter: method
+    tags-sorter: alpha
+    persist-authorization: true
