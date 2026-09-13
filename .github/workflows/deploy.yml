@@ -1,4 +1,276 @@
-name: deploy.yml
+name: OrderFlow Deploy
+
 on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  id-token: write
+
+concurrency:
+  group: orderflow-deploy
+  cancel-in-progress: false
+
+env:
+  AWS_REGION: ${{ vars.AWS_REGION }}
+  PROJECT_NAME: orderflow
+  ENVIRONMENT: dev
 
 jobs:
+  deploy:
+    name: Deploy to ECS
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v7
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v6
+        with:
+          role-to-assume: ${{ vars.AWS_DEPLOY_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+          role-session-name: orderflow-${{ github.run_id }}
+
+      - name: Verify AWS identity
+        run: aws sts get-caller-identity
+
+      - name: Login to Amazon ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Set deployment variables
+        run: |
+          echo "IMAGE_TAG=${GITHUB_SHA}" >> "$GITHUB_ENV"
+          echo "ECR_REGISTRY=${{ steps.login-ecr.outputs.registry }}" >> "$GITHUB_ENV"
+          echo "CLUSTER=${PROJECT_NAME}-${ENVIRONMENT}-cluster" >> "$GITHUB_ENV"
+
+      - name: Build and push API Gateway
+        run: |
+          IMAGE="${ECR_REGISTRY}/${PROJECT_NAME}/api-gateway:${IMAGE_TAG}"
+
+          docker build \
+            -f api-gateway/Dockerfile \
+            -t "${IMAGE}" \
+            .
+
+          docker push "${IMAGE}"
+
+      - name: Build and push User Service
+        run: |
+          IMAGE="${ECR_REGISTRY}/${PROJECT_NAME}/user-service:${IMAGE_TAG}"
+
+          docker build \
+            -f user-service/Dockerfile \
+            -t "${IMAGE}" \
+            .
+
+          docker push "${IMAGE}"
+
+      - name: Build and push Inventory Service
+        run: |
+          IMAGE="${ECR_REGISTRY}/${PROJECT_NAME}/inventory-service:${IMAGE_TAG}"
+
+          docker build \
+            -f inventory-service/Dockerfile \
+            -t "${IMAGE}" \
+            .
+
+          docker push "${IMAGE}"
+
+      - name: Build and push Order Service
+        run: |
+          IMAGE="${ECR_REGISTRY}/${PROJECT_NAME}/order-service:${IMAGE_TAG}"
+
+          docker build \
+            -f order-service/Dockerfile \
+            -t "${IMAGE}" \
+            .
+
+          docker push "${IMAGE}"
+
+      - name: Build and push Notification Service
+        run: |
+          IMAGE="${ECR_REGISTRY}/${PROJECT_NAME}/notification-service:${IMAGE_TAG}"
+
+          docker build \
+            -f notification-service/Dockerfile \
+            -t "${IMAGE}" \
+            .
+
+          docker push "${IMAGE}"
+
+      - name: Discover ECS network
+        run: |
+          SUBNETS="$(
+            aws ec2 describe-subnets \
+              --filters \
+                "Name=tag:Project,Values=${PROJECT_NAME}" \
+                "Name=tag:Environment,Values=${ENVIRONMENT}" \
+                "Name=tag:Tier,Values=public" \
+              --query 'Subnets[].SubnetId' \
+              --output text |
+              tr '\t' ','
+          )"
+
+          SECURITY_GROUP="$(
+            aws ec2 describe-security-groups \
+              --filters \
+                "Name=group-name,Values=${PROJECT_NAME}-${ENVIRONMENT}-ecs-sg" \
+              --query 'SecurityGroups[0].GroupId' \
+              --output text
+          )"
+
+          echo "PUBLIC_SUBNETS=${SUBNETS}" >> "$GITHUB_ENV"
+          echo "ECS_SECURITY_GROUP=${SECURITY_GROUP}" >> "$GITHUB_ENV"
+
+      - name: Bootstrap PostgreSQL databases
+        run: |
+          TASK_ARN="$(
+            aws ecs run-task \
+              --cluster "${CLUSTER}" \
+              --launch-type FARGATE \
+              --platform-version LATEST \
+              --task-definition "${PROJECT_NAME}-${ENVIRONMENT}-database-bootstrap" \
+              --network-configuration \
+              "awsvpcConfiguration={subnets=[${PUBLIC_SUBNETS}],securityGroups=[${ECS_SECURITY_GROUP}],assignPublicIp=ENABLED}" \
+              --query 'tasks[0].taskArn' \
+              --output text
+          )"
+
+          if [ -z "${TASK_ARN}" ] || [ "${TASK_ARN}" = "None" ]; then
+            echo "Database bootstrap task failed to start"
+            exit 1
+          fi
+
+          aws ecs wait tasks-stopped \
+            --cluster "${CLUSTER}" \
+            --tasks "${TASK_ARN}"
+
+          EXIT_CODE="$(
+            aws ecs describe-tasks \
+              --cluster "${CLUSTER}" \
+              --tasks "${TASK_ARN}" \
+              --query "tasks[0].containers[?name=='database-bootstrap'].exitCode | [0]" \
+              --output text
+          )"
+
+          if [ "${EXIT_CODE}" != "0" ]; then
+            aws ecs describe-tasks \
+              --cluster "${CLUSTER}" \
+              --tasks "${TASK_ARN}"
+
+            exit 1
+          fi
+
+      - name: Deploy ECS services
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          deploy_service() {
+            SERVICE="$1"
+
+            ECS_SERVICE="${PROJECT_NAME}-${ENVIRONMENT}-${SERVICE}"
+            IMAGE="${ECR_REGISTRY}/${PROJECT_NAME}/${SERVICE}:${IMAGE_TAG}"
+
+            CURRENT_TASK_DEFINITION="$(
+              aws ecs describe-services \
+                --cluster "${CLUSTER}" \
+                --services "${ECS_SERVICE}" \
+                --query 'services[0].taskDefinition' \
+                --output text
+            )"
+
+            aws ecs describe-task-definition \
+              --task-definition "${CURRENT_TASK_DEFINITION}" \
+              --query taskDefinition \
+              > current-task-definition.json
+
+            jq \
+              --arg SERVICE "${SERVICE}" \
+              --arg IMAGE "${IMAGE}" \
+              '
+              .containerDefinitions |= map(
+                if .name == $SERVICE then
+                  .image = $IMAGE
+                else
+                  .
+                end
+              )
+              |
+              del(
+                .taskDefinitionArn,
+                .revision,
+                .status,
+                .requiresAttributes,
+                .compatibilities,
+                .registeredAt,
+                .registeredBy
+              )
+              ' \
+              current-task-definition.json \
+              > next-task-definition.json
+
+            NEW_TASK_DEFINITION="$(
+              aws ecs register-task-definition \
+                --cli-input-json file://next-task-definition.json \
+                --query 'taskDefinition.taskDefinitionArn' \
+                --output text
+            )"
+
+            aws ecs update-service \
+              --cluster "${CLUSTER}" \
+              --service "${ECS_SERVICE}" \
+              --task-definition "${NEW_TASK_DEFINITION}" \
+              --desired-count 1 \
+              --force-new-deployment \
+              > /dev/null
+
+            echo "Deployed ${SERVICE}"
+          }
+
+          deploy_service user-service
+          deploy_service inventory-service
+          deploy_service order-service
+          deploy_service notification-service
+          deploy_service api-gateway
+
+      - name: Wait for ECS services
+        run: |
+          aws ecs wait services-stable \
+            --cluster "${CLUSTER}" \
+            --services \
+              "${PROJECT_NAME}-${ENVIRONMENT}-user-service" \
+              "${PROJECT_NAME}-${ENVIRONMENT}-inventory-service" \
+              "${PROJECT_NAME}-${ENVIRONMENT}-order-service" \
+              "${PROJECT_NAME}-${ENVIRONMENT}-notification-service" \
+              "${PROJECT_NAME}-${ENVIRONMENT}-api-gateway"
+
+      - name: Verify running tasks
+        run: |
+          aws ecs describe-services \
+            --cluster "${CLUSTER}" \
+            --services \
+              "${PROJECT_NAME}-${ENVIRONMENT}-user-service" \
+              "${PROJECT_NAME}-${ENVIRONMENT}-inventory-service" \
+              "${PROJECT_NAME}-${ENVIRONMENT}-order-service" \
+              "${PROJECT_NAME}-${ENVIRONMENT}-notification-service" \
+              "${PROJECT_NAME}-${ENVIRONMENT}-api-gateway" \
+            --query \
+            'services[].{Service:serviceName,Desired:desiredCount,Running:runningCount,Pending:pendingCount}' \
+            --output table
+
+      - name: Verify ALB target
+        run: |
+          TARGET_GROUP_ARN="$(
+            aws elbv2 describe-target-groups \
+              --names "${PROJECT_NAME}-${ENVIRONMENT}-gateway" \
+              --query 'TargetGroups[0].TargetGroupArn' \
+              --output text
+          )"
+
+          aws elbv2 describe-target-health \
+            --target-group-arn "${TARGET_GROUP_ARN}" \
+            --output table

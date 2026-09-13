@@ -60,12 +60,41 @@ jobs:
             -DskipTests \
             package
 
+  terraform-validate:
+    name: Terraform Validate
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+
+    defaults:
+      run:
+        working-directory: infrastructure/aws
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v7
+
+      - name: Set up Terraform
+        uses: hashicorp/setup-terraform@v4
+        with:
+          terraform_version: "~1.16.0"
+
+      - name: Terraform format
+        run: terraform fmt -check -recursive
+
+      - name: Terraform init
+        run: terraform init -backend=false -input=false
+
+      - name: Terraform validate
+        run: terraform validate -no-color
+
   docker-build:
     name: Docker Build
     runs-on: ubuntu-24.04
     timeout-minutes: 45
+
     needs:
       - maven-quality-gate
+      - terraform-validate
 
     steps:
       - name: Checkout repository
@@ -77,9 +106,7 @@ jobs:
           docker compose version
 
       - name: Validate Docker Compose
-        run: |
-          docker compose config --quiet
+        run: docker compose config --quiet
 
       - name: Build all Docker images
-        run: |
-          docker compose build
+        run: docker compose build
