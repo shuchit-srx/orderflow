@@ -27,12 +27,19 @@ env:
 jobs:
   deploy:
     name: Deploy to ECS
+
+    if: >
+      github.event_name == 'workflow_dispatch' ||
+      github.event.workflow_run.conclusion == 'success'
+
     runs-on: ubuntu-24.04
     timeout-minutes: 60
 
     steps:
       - name: Checkout repository
         uses: actions/checkout@v7
+        with:
+          ref: ${{ github.event_name == 'workflow_run' && github.event.workflow_run.head_sha || github.sha }}
 
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v6
@@ -49,10 +56,19 @@ jobs:
         uses: aws-actions/amazon-ecr-login@v2
 
       - name: Set deployment variables
+        shell: bash
         run: |
-          echo "IMAGE_TAG=${GITHUB_SHA}" >> "$GITHUB_ENV"
+          if [ "${{ github.event_name }}" = "workflow_run" ]; then
+            DEPLOY_SHA="${{ github.event.workflow_run.head_sha }}"
+          else
+            DEPLOY_SHA="${GITHUB_SHA}"
+          fi
+
+          echo "IMAGE_TAG=${DEPLOY_SHA}" >> "$GITHUB_ENV"
           echo "ECR_REGISTRY=${{ steps.login-ecr.outputs.registry }}" >> "$GITHUB_ENV"
           echo "CLUSTER=${PROJECT_NAME}-${ENVIRONMENT}-cluster" >> "$GITHUB_ENV"
+
+          echo "Deploying commit: ${DEPLOY_SHA}"
 
       - name: Build and push API Gateway
         run: |
