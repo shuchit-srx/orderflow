@@ -75,7 +75,7 @@ jobs:
           IMAGE="${ECR_REGISTRY}/${PROJECT_NAME}/api-gateway:${IMAGE_TAG}"
 
           docker build \
-            --platform linux/amd64
+            --platform linux/amd64 \
             -f api-gateway/Dockerfile \
             -t "${IMAGE}" \
             .
@@ -87,7 +87,7 @@ jobs:
           IMAGE="${ECR_REGISTRY}/${PROJECT_NAME}/user-service:${IMAGE_TAG}"
 
           docker build \
-            --platform linux/amd64
+            --platform linux/amd64 \
             -f user-service/Dockerfile \
             -t "${IMAGE}" \
             .
@@ -99,7 +99,7 @@ jobs:
           IMAGE="${ECR_REGISTRY}/${PROJECT_NAME}/inventory-service:${IMAGE_TAG}"
 
           docker build \
-            --platform linux/amd64
+            --platform linux/amd64 \
             -f inventory-service/Dockerfile \
             -t "${IMAGE}" \
             .
@@ -111,7 +111,7 @@ jobs:
           IMAGE="${ECR_REGISTRY}/${PROJECT_NAME}/order-service:${IMAGE_TAG}"
 
           docker build \
-            --platform linux/amd64
+            --platform linux/amd64 \
             -f order-service/Dockerfile \
             -t "${IMAGE}" \
             .
@@ -123,7 +123,7 @@ jobs:
           IMAGE="${ECR_REGISTRY}/${PROJECT_NAME}/notification-service:${IMAGE_TAG}"
 
           docker build \
-            --platform linux/amd64
+            --platform linux/amd64 \
             -f notification-service/Dockerfile \
             -t "${IMAGE}" \
             .
