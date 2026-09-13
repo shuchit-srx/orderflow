@@ -17,3 +17,14 @@ rabbitmq_instance_type  = "mq.m7g.medium"
 rabbitmq_username       = "orderflow"
 
 cloudwatch_log_retention_days = 14
+
+github_repository = "shuchit-srx/orderflow"
+github_branch     = "main"
+
+enable_https    = false
+domain_name     = null
+route53_zone_id = null
+
+enable_https    = true
+domain_name     = "api.yourdomain.com"
+route53_zone_id = "YOUR_ROUTE53_ZONE_ID"

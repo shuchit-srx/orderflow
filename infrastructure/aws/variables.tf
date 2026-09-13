@@ -67,3 +67,30 @@ variable "cloudwatch_log_retention_days" {
   type    = number
   default = 14
 }
+
+variable "github_repository" {
+  type    = string
+  default = "shuchit-srx/orderflow"
+}
+
+variable "github_branch" {
+  type    = string
+  default = "main"
+}
+
+variable "enable_https" {
+  type    = bool
+  default = false
+}
+
+variable "domain_name" {
+  type     = string
+  default  = null
+  nullable = true
+}
+
+variable "route53_zone_id" {
+  type     = string
+  default  = null
+  nullable = true
+}

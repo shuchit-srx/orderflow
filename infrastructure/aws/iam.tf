@@ -59,3 +59,134 @@ resource "aws_iam_role" "ecs_task" {
 
   assume_role_policy = data.aws_iam_policy_document.ecs_task_assume_role.json
 }
+
+data "aws_caller_identity" "current" {}
+
+resource "aws_iam_openid_connect_provider" "github" {
+  url = "https://token.actions.githubusercontent.com"
+
+  client_id_list = [
+    "sts.amazonaws.com"
+  ]
+}
+
+data "aws_iam_policy_document" "github_deploy_assume_role" {
+  statement {
+    effect = "Allow"
+
+    actions = [
+      "sts:AssumeRoleWithWebIdentity"
+    ]
+
+    principals {
+      type = "Federated"
+
+      identifiers = [
+        aws_iam_openid_connect_provider.github.arn
+      ]
+    }
+
+    condition {
+      test     = "StringEquals"
+      variable = "token.actions.githubusercontent.com:aud"
+
+      values = [
+        "sts.amazonaws.com"
+      ]
+    }
+
+    condition {
+      test     = "StringLike"
+      variable = "token.actions.githubusercontent.com:sub"
+
+      values = [
+        "repo:${local.github_owner}*/${local.github_repo}*:ref:refs/heads/${var.github_branch}"
+      ]
+    }
+  }
+}
+
+resource "aws_iam_role" "github_deploy" {
+  name = "${local.name_prefix}-github-deploy"
+
+  assume_role_policy = data.aws_iam_policy_document.github_deploy_assume_role.json
+}
+
+data "aws_iam_policy_document" "github_deploy" {
+  statement {
+    effect = "Allow"
+
+    actions = [
+      "ecr:GetAuthorizationToken"
+    ]
+
+    resources = ["*"]
+  }
+
+  statement {
+    effect = "Allow"
+
+    actions = [
+      "ecr:BatchCheckLayerAvailability",
+      "ecr:CompleteLayerUpload",
+      "ecr:GetDownloadUrlForLayer",
+      "ecr:InitiateLayerUpload",
+      "ecr:PutImage",
+      "ecr:UploadLayerPart",
+      "ecr:BatchGetImage"
+    ]
+
+    resources = [
+      for repository in aws_ecr_repository.services :
+      repository.arn
+    ]
+  }
+
+  statement {
+    effect = "Allow"
+
+    actions = [
+      "ecs:DescribeClusters",
+      "ecs:DescribeServices",
+      "ecs:DescribeTaskDefinition",
+      "ecs:DescribeTasks",
+      "ecs:RegisterTaskDefinition",
+      "ecs:UpdateService",
+      "ecs:RunTask"
+    ]
+
+    resources = ["*"]
+  }
+
+  statement {
+    effect = "Allow"
+
+    actions = [
+      "ec2:DescribeSubnets",
+      "ec2:DescribeSecurityGroups",
+      "elasticloadbalancing:DescribeTargetHealth"
+    ]
+
+    resources = ["*"]
+  }
+
+  statement {
+    effect = "Allow"
+
+    actions = [
+      "iam:PassRole"
+    ]
+
+    resources = [
+      aws_iam_role.ecs_execution.arn,
+      aws_iam_role.ecs_task.arn
+    ]
+  }
+}
+
+resource "aws_iam_role_policy" "github_deploy" {
+  name = "${local.name_prefix}-deploy"
+
+  role   = aws_iam_role.github_deploy.id
+  policy = data.aws_iam_policy_document.github_deploy.json
+}

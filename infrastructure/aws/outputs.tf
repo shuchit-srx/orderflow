@@ -88,3 +88,25 @@ output "jwt_private_key_secret_arn" {
 output "jwt_public_key_secret_arn" {
   value = aws_secretsmanager_secret.jwt_public_key.arn
 }
+output "github_deploy_role_arn" {
+  value = aws_iam_role.github_deploy.arn
+}
+
+output "ecs_service_names" {
+  value = {
+    for name, service in aws_ecs_service.services :
+    name => service.name
+  }
+}
+
+output "database_bootstrap_task_family" {
+  value = aws_ecs_task_definition.database_bootstrap.family
+}
+
+output "service_connect_namespace" {
+  value = aws_service_discovery_http_namespace.service_connect.name
+}
+
+output "application_url" {
+  value = var.enable_https ? "https://${var.domain_name}" : "http://${aws_lb.main.dns_name}"
+}
