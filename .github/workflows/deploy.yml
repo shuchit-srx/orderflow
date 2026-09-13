@@ -3,6 +3,14 @@ name: OrderFlow Deploy
 on:
   workflow_dispatch:
 
+  workflow_run:
+    workflows:
+      - OrderFlow CI
+    types:
+      - completed
+    branches:
+      - main
+
 permissions:
   contents: read
   id-token: write
@@ -51,6 +59,7 @@ jobs:
           IMAGE="${ECR_REGISTRY}/${PROJECT_NAME}/api-gateway:${IMAGE_TAG}"
 
           docker build \
+            --platform linux/amd64
             -f api-gateway/Dockerfile \
             -t "${IMAGE}" \
             .
@@ -62,6 +71,7 @@ jobs:
           IMAGE="${ECR_REGISTRY}/${PROJECT_NAME}/user-service:${IMAGE_TAG}"
 
           docker build \
+            --platform linux/amd64
             -f user-service/Dockerfile \
             -t "${IMAGE}" \
             .
@@ -73,6 +83,7 @@ jobs:
           IMAGE="${ECR_REGISTRY}/${PROJECT_NAME}/inventory-service:${IMAGE_TAG}"
 
           docker build \
+            --platform linux/amd64
             -f inventory-service/Dockerfile \
             -t "${IMAGE}" \
             .
@@ -84,6 +95,7 @@ jobs:
           IMAGE="${ECR_REGISTRY}/${PROJECT_NAME}/order-service:${IMAGE_TAG}"
 
           docker build \
+            --platform linux/amd64
             -f order-service/Dockerfile \
             -t "${IMAGE}" \
             .
@@ -95,6 +107,7 @@ jobs:
           IMAGE="${ECR_REGISTRY}/${PROJECT_NAME}/notification-service:${IMAGE_TAG}"
 
           docker build \
+            --platform linux/amd64
             -f notification-service/Dockerfile \
             -t "${IMAGE}" \
             .
@@ -176,10 +189,9 @@ jobs:
             IMAGE="${ECR_REGISTRY}/${PROJECT_NAME}/${SERVICE}:${IMAGE_TAG}"
 
             CURRENT_TASK_DEFINITION="$(
-              aws ecs describe-services \
-                --cluster "${CLUSTER}" \
-                --services "${ECS_SERVICE}" \
-                --query 'services[0].taskDefinition' \
+              aws ecs describe-task-definition \
+                --task-definition "${PROJECT_NAME}-${ENVIRONMENT}-${SERVICE}" \
+                --query 'taskDefinition.taskDefinitionArn' \
                 --output text
             )"
 
@@ -199,6 +211,11 @@ jobs:
                   .
                 end
               )
+              |
+              .runtimePlatform = {
+                "cpuArchitecture": "X86_64",
+                "operatingSystemFamily": "LINUX"
+              }
               |
               del(
                 .taskDefinitionArn,
@@ -238,15 +255,110 @@ jobs:
           deploy_service api-gateway
 
       - name: Wait for ECS services
+        shell: bash
         run: |
+          set +e
+
+          SERVICES=(
+            "${PROJECT_NAME}-${ENVIRONMENT}-user-service"
+            "${PROJECT_NAME}-${ENVIRONMENT}-inventory-service"
+            "${PROJECT_NAME}-${ENVIRONMENT}-order-service"
+            "${PROJECT_NAME}-${ENVIRONMENT}-notification-service"
+            "${PROJECT_NAME}-${ENVIRONMENT}-api-gateway"
+          )
+
           aws ecs wait services-stable \
             --cluster "${CLUSTER}" \
-            --services \
-              "${PROJECT_NAME}-${ENVIRONMENT}-user-service" \
-              "${PROJECT_NAME}-${ENVIRONMENT}-inventory-service" \
-              "${PROJECT_NAME}-${ENVIRONMENT}-order-service" \
-              "${PROJECT_NAME}-${ENVIRONMENT}-notification-service" \
-              "${PROJECT_NAME}-${ENVIRONMENT}-api-gateway"
+            --services "${SERVICES[@]}"
+
+          WAIT_STATUS=$?
+
+          if [ "${WAIT_STATUS}" -eq 0 ]; then
+            echo "All ECS services reached steady state."
+            exit 0
+          fi
+
+          echo
+          echo "ECS services did not reach steady state."
+          echo
+          echo "===== SERVICE STATUS ====="
+
+          aws ecs describe-services \
+            --cluster "${CLUSTER}" \
+            --services "${SERVICES[@]}" \
+            --query 'services[].{
+              Service:serviceName,
+              Status:status,
+              Desired:desiredCount,
+              Running:runningCount,
+              Pending:pendingCount,
+              TaskDefinition:taskDefinition,
+              Deployments:deployments[].{
+                Status:status,
+                RolloutState:rolloutState,
+                RolloutStateReason:rolloutStateReason,
+                Desired:desiredCount,
+                Running:runningCount,
+                Pending:pendingCount,
+                Failed:failedTasks
+              }
+            }' \
+            --output json
+
+          echo
+          echo "===== RECENT SERVICE EVENTS ====="
+
+          for SERVICE in "${SERVICES[@]}"; do
+            echo
+            echo "--- ${SERVICE} ---"
+
+            aws ecs describe-services \
+              --cluster "${CLUSTER}" \
+              --services "${SERVICE}" \
+              --query 'services[0].events[0:10].[createdAt,message]' \
+              --output table
+          done
+
+          echo
+          echo "===== RECENT STOPPED TASKS ====="
+
+          for SERVICE in "${SERVICES[@]}"; do
+            echo
+            echo "--- ${SERVICE} ---"
+
+            TASKS="$(
+              aws ecs list-tasks \
+                --cluster "${CLUSTER}" \
+                --service-name "${SERVICE}" \
+                --desired-status STOPPED \
+                --query 'taskArns[0:5]' \
+                --output text
+            )"
+
+            if [ -z "${TASKS}" ] || [ "${TASKS}" = "None" ]; then
+              echo "No recent stopped tasks found."
+              continue
+            fi
+
+            aws ecs describe-tasks \
+              --cluster "${CLUSTER}" \
+              --tasks ${TASKS} \
+              --query 'tasks[].{
+                Task:taskArn,
+                TaskDefinition:taskDefinitionArn,
+                StopCode:stopCode,
+                StoppedReason:stoppedReason,
+                Containers:containers[].{
+                  Name:name,
+                  LastStatus:lastStatus,
+                  ExitCode:exitCode,
+                  Reason:reason
+                }
+              }' \
+              --output json
+          done
+
+          exit "${WAIT_STATUS}"
 
       - name: Verify running tasks
         run: |
