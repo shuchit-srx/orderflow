@@ -13,7 +13,7 @@ redis_engine_version = "7.1"
 redis_node_type       = "cache.t4g.micro"
 
 rabbitmq_engine_version = "3.13"
-rabbitmq_instance_type  = "mq.t3.micro"
+rabbitmq_instance_type  = "mq.m7g.medium"
 rabbitmq_username       = "orderflow"
 
 cloudwatch_log_retention_days = 14

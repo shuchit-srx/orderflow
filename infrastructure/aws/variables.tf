@@ -55,7 +55,7 @@ variable "rabbitmq_engine_version" {
 
 variable "rabbitmq_instance_type" {
   type    = string
-  default = "mq.t3.micro"
+  default = "mq.m7g.medium"
 }
 
 variable "rabbitmq_username" {
