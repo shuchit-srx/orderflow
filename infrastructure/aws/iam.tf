@@ -150,6 +150,7 @@ data "aws_iam_policy_document" "github_deploy" {
       "ecs:DescribeServices",
       "ecs:DescribeTaskDefinition",
       "ecs:DescribeTasks",
+      "ecs:ListTasks",
       "ecs:RegisterTaskDefinition",
       "ecs:UpdateService",
       "ecs:RunTask"
@@ -164,6 +165,7 @@ data "aws_iam_policy_document" "github_deploy" {
     actions = [
       "ec2:DescribeSubnets",
       "ec2:DescribeSecurityGroups",
+      "elasticloadbalancing:DescribeTargetGroups",
       "elasticloadbalancing:DescribeTargetHealth"
     ]
 
