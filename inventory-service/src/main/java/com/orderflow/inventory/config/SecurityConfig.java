@@ -1,24 +1,16 @@
 package com.orderflow.inventory.config;
 
 import com.orderflow.inventory.security.InternalServiceAuthenticationFilter;
+import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
-
 import org.springframework.http.HttpMethod;
-
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configurers.AbstractHttpConfigurer;
 import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationConverter;
-import org.springframework.security.web.SecurityFilterChain;
-
-import com.orderflow.inventory.config.InternalServiceAuthProperties;
-
-import org.springframework.boot.context.properties.EnableConfigurationProperties;
-
 import org.springframework.security.oauth2.server.resource.web.authentication.BearerTokenAuthenticationFilter;
-
-import org.springframework.http.HttpMethod;
+import org.springframework.security.web.SecurityFilterChain;
 
 @EnableConfigurationProperties(
         InternalServiceAuthProperties.class
@@ -32,7 +24,6 @@ public class SecurityConfig {
     public SecurityConfig(
             InternalServiceAuthProperties internalServiceAuthProperties
     ) {
-
         this.internalServiceAuthProperties =
                 internalServiceAuthProperties;
     }
@@ -42,8 +33,8 @@ public class SecurityConfig {
             HttpSecurity http,
             JwtAuthenticationConverter jwtAuthenticationConverter
     ) {
-            InternalServiceAuthenticationFilter
-                internalFilter =
+
+        InternalServiceAuthenticationFilter internalFilter =
                 new InternalServiceAuthenticationFilter(
                         internalServiceAuthProperties
                 );
@@ -57,44 +48,72 @@ public class SecurityConfig {
                         )
                 )
 
+                .authorizeHttpRequests(auth -> auth
 
-                .authorizeHttpRequests(
-                        auth ->
-                                auth
+                        /*
+                         * Health endpoint
+                         */
+                        .requestMatchers(
+                                "/actuator/health",
+                                "/actuator/health/**"
+                        )
+                        .permitAll()
 
-                                        .requestMatchers(
-                                                "/actuator/health"
-                                        )
-                                        .permitAll()
+                        /*
+                         * Public product reads
+                         */
+                        .requestMatchers(
+                                HttpMethod.GET,
+                                "/api/v1/products",
+                                "/api/v1/products/**"
+                        )
+                        .permitAll()
 
-                                        .requestMatchers(
-                                                HttpMethod.GET,
-                                                "/api/v1/products/**"
-                                        )
-                                        .permitAll()
+                        .requestMatchers(
+                                HttpMethod.HEAD,
+                                "/api/v1/products",
+                                "/api/v1/products/**"
+                        )
+                        .permitAll()
 
-                                        .requestMatchers(
-                                                HttpMethod.GET,
-                                                "/api/v1/inventory/**"
-                                        )
-                                        .permitAll()
+                        /*
+                         * Public inventory reads
+                         */
+                        .requestMatchers(
+                                HttpMethod.GET,
+                                "/api/v1/inventory",
+                                "/api/v1/inventory/**"
+                        )
+                        .permitAll()
 
-                                        .requestMatchers(
-                                                "/api/v1/internal/**"
-                                        )
-                                        .hasRole(
-                                                "SERVICE"
-                                        )
+                        .requestMatchers(
+                                HttpMethod.HEAD,
+                                "/api/v1/inventory",
+                                "/api/v1/inventory/**"
+                        )
+                        .permitAll()
 
-                                        .requestMatchers(
-                                                "/api/v1/admin/**"
-                                        )
-                                        .hasRole(
-                                                "ADMIN"
-                                        )
+                        /*
+                         * Internal service-to-service APIs
+                         */
+                        .requestMatchers(
+                                "/api/v1/internal/**"
+                        )
+                        .hasRole("SERVICE")
 
-                                        .anyRequest()
-                                        .authenticated()
+                        /*
+                         * Admin APIs
+                         */
+                        .requestMatchers(
+                                "/api/v1/admin/**"
+                        )
+                        .hasRole("ADMIN")
+
+                        /*
+                         * Everything else requires authentication.
+                         */
+                        .anyRequest()
+                        .authenticated()
                 )
 
                 .oauth2ResourceServer(oauth2 ->
@@ -104,6 +123,11 @@ public class SecurityConfig {
                                 )
                         )
                 )
+
+                /*
+                 * Existing internal-service authentication.
+                 * Keep this before BearerTokenAuthenticationFilter.
+                 */
                 .addFilterBefore(
                         internalFilter,
                         BearerTokenAuthenticationFilter.class

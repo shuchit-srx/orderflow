@@ -41,3 +41,14 @@ springdoc:
     operations-sorter: method
     tags-sorter: alpha
     persist-authorization: true
+
+outbox:
+  publisher:
+    enabled: true
+    fixed-delay-ms: 1000
+    batch-size: 50
+    max-attempts: 10
+    stale-processing-after: 30s
+    base-backoff: 1s
+    max-backoff: 60s
+    confirm-timeout: 5s

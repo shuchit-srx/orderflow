@@ -67,11 +67,13 @@ coverage/
 *.swp
 *.swo
 
-# JWT private signing key
-user-service/keys/private.pem
+# JWT private keys
+**/keys/private.pem
+**/keys/*-private.pem
 
 # =========================
 # Other files
 # =========================
 docs
-README.md
+*.md
+infrastructure/aws/security-hardening.md

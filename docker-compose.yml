@@ -271,18 +271,18 @@ services:
 
     environment:
       SPRING_PROFILES_ACTIVE: ${SPRING_PROFILES_ACTIVE:-local},docker
+      JWT_PUBLIC_KEY_PATH: file:/keys/public.pem
 
       SPRING_DATA_REDIS_HOST: redis
       SPRING_DATA_REDIS_PORT: 6379
 
       SECURITY_JWT_PUBLIC_KEY_LOCATION: file:/run/secrets/jwt/public.pem
       SECURITY_JWT_ISSUER: ${JWT_ISSUER:-orderflow-user-service}
-
-    volumes:
-      - ${JWT_PUBLIC_KEY_HOST_PATH:-./user-service/src/main/resources/keys/public.pem}:/run/secrets/jwt/public.pem:ro
-
     ports:
       - "${API_GATEWAY_PORT:-8080}:8080"
+
+    volumes:
+      - ./api-gateway/keys/public.pem:/keys/public.pem:ro
 
     depends_on:
       user-service:

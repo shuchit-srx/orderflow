@@ -3,6 +3,13 @@ resource "aws_service_discovery_http_namespace" "service_connect" {
 }
 
 locals {
+  # Existing private ECS subnets created for the dev environment.
+  # Replace these with aws_subnet.private[*].id once the subnets are imported/managed by Terraform.
+  ecs_private_subnet_ids = [
+    "subnet-03bfda6abeaab999b",
+    "subnet-03918348927d9d8b5",
+  ]
+
   service_environment = {
     api-gateway = [
       {
@@ -28,6 +35,10 @@ locals {
       {
         name  = "SECURITY_JWT_ISSUER"
         value = "orderflow-user-service"
+      },
+      {
+        name  = "RATE_LIMIT_TRUST_FORWARDED_FOR"
+        value = "true"
       }
     ]
 
@@ -379,13 +390,13 @@ resource "aws_ecs_service" "services" {
   platform_version = "LATEST"
 
   network_configuration {
-    subnets = aws_subnet.public[*].id
+    subnets = local.ecs_private_subnet_ids
 
     security_groups = [
       aws_security_group.ecs.id
     ]
 
-    assign_public_ip = true
+    assign_public_ip = false
   }
 
   service_connect_configuration {
