@@ -28,7 +28,7 @@ services:
     base-url: ${INVENTORY_SERVICE_URL:http://localhost:8082}
     connect-timeout: 2s
     read-timeout: 3s
-    internal-token: ${INTERNAL_SERVICE_TOKEN:local-orderflow-internal-token-change-me}
+    internal-token: ${SECURITY_INTERNAL_TOKEN:local-orderflow-internal-token-change-me}
 
 security:
   jwt:

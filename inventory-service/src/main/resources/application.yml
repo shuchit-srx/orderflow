@@ -30,7 +30,7 @@ server:
 
 security:
   internal:
-    token: ${INTERNAL_SERVICE_TOKEN:local-internal-service-token}
+    token: ${SECURITY_INTERNAL_TOKEN:local-internal-service-token}
 
 orderflow:
   cache:
