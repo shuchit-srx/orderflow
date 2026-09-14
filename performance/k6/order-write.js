@@ -59,6 +59,13 @@ export default function (data) {
 
     check(response, {
         'order create status is 201': (r) => r.status === 201,
+        'order is confirmed': (r) => {
+            try {
+                return r.json('status') === 'CONFIRMED';
+            } catch (_) {
+                return false;
+            }
+        },
     });
 }
 
