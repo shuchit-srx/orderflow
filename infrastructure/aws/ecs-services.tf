@@ -29,7 +29,7 @@ locals {
         value = "true"
       },
       {
-        name  = "SECURITY_JWT_PUBLIC_KEY_LOCATION"
+        name  = "JWT_PUBLIC_KEY_PATH"
         value = "file:/run/secrets/jwt/public.pem"
       },
       {
@@ -56,7 +56,7 @@ locals {
         value = "file:/run/secrets/jwt/private.pem"
       },
       {
-        name  = "SECURITY_JWT_PUBLIC_KEY_LOCATION"
+        name  = "JWT_PUBLIC_KEY_PATH"
         value = "file:/run/secrets/jwt/public.pem"
       },
       {
@@ -87,7 +87,7 @@ locals {
         value = "true"
       },
       {
-        name  = "SECURITY_JWT_PUBLIC_KEY_LOCATION"
+        name  = "JWT_PUBLIC_KEY_PATH"
         value = "file:/run/secrets/jwt/public.pem"
       },
       {
@@ -130,7 +130,7 @@ locals {
         value = "http://inventory-service:8082"
       },
       {
-        name  = "SECURITY_JWT_PUBLIC_KEY_LOCATION"
+        name  = "JWT_PUBLIC_KEY_PATH"
         value = "file:/run/secrets/jwt/public.pem"
       },
       {

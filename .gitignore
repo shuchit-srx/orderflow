@@ -77,3 +77,6 @@ coverage/
 docs
 *.md
 infrastructure/aws/security-hardening.md
+
+performance/reports/*.json
+!performance/reports/.gitkeep
