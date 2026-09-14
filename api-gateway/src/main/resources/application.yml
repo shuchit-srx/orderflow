@@ -7,7 +7,7 @@ spring:
     oauth2:
       resourceserver:
         jwt:
-          public-key-location: ${JWT_PUBLIC_KEY_PATH:file:/keys/public.pem}
+          public-key-location: ${SECURITY_JWT_PUBLIC_KEY_LOCATION:file:/keys/public.pem}
   data:
     redis:
       connect-timeout: ${REDIS_CONNECT_TIMEOUT:1s}

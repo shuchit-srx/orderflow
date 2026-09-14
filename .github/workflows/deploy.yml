@@ -216,35 +216,84 @@ jobs:
               --query taskDefinition \
               > current-task-definition.json
 
-            jq \
-              --arg SERVICE "${SERVICE}" \
-              --arg IMAGE "${IMAGE}" \
-              '
-              .containerDefinitions |= map(
-                if .name == $SERVICE then
-                  .image = $IMAGE
-                else
-                  .
-                end
-              )
-              |
-              .runtimePlatform = {
-                "cpuArchitecture": "X86_64",
-                "operatingSystemFamily": "LINUX"
-              }
-              |
-              del(
-                .taskDefinitionArn,
-                .revision,
-                .status,
-                .requiresAttributes,
-                .compatibilities,
-                .registeredAt,
-                .registeredBy
-              )
-              ' \
-              current-task-definition.json \
-              > next-task-definition.json
+            if [ "${SERVICE}" = "api-gateway" ]; then
+              jq \
+                --arg SERVICE "${SERVICE}" \
+                --arg IMAGE "${IMAGE}" \
+                '
+                .containerDefinitions |= map(
+                  if .name == $SERVICE then
+                    .image = $IMAGE
+                    |
+                    .environment = (
+                      (.environment // [])
+                      | map(
+                          select(
+                            .name != "SECURITY_JWT_PUBLIC_KEY_LOCATION"
+                            and
+                            .name != "JWT_PUBLIC_KEY_PATH"
+                          )
+                        )
+                      + [
+                          {
+                            "name": "SECURITY_JWT_PUBLIC_KEY_LOCATION",
+                            "value": "file:/run/secrets/jwt/public.pem"
+                          }
+                        ]
+                    )
+                  else
+                    .
+                  end
+                )
+                |
+                .runtimePlatform = {
+                  "cpuArchitecture": "X86_64",
+                  "operatingSystemFamily": "LINUX"
+                }
+                |
+                del(
+                  .taskDefinitionArn,
+                  .revision,
+                  .status,
+                  .requiresAttributes,
+                  .compatibilities,
+                  .registeredAt,
+                  .registeredBy
+                )
+                ' \
+                current-task-definition.json \
+                > next-task-definition.json
+            else
+              jq \
+                --arg SERVICE "${SERVICE}" \
+                --arg IMAGE "${IMAGE}" \
+                '
+                .containerDefinitions |= map(
+                  if .name == $SERVICE then
+                    .image = $IMAGE
+                  else
+                    .
+                  end
+                )
+                |
+                .runtimePlatform = {
+                  "cpuArchitecture": "X86_64",
+                  "operatingSystemFamily": "LINUX"
+                }
+                |
+                del(
+                  .taskDefinitionArn,
+                  .revision,
+                  .status,
+                  .requiresAttributes,
+                  .compatibilities,
+                  .registeredAt,
+                  .registeredBy
+                )
+                ' \
+                current-task-definition.json \
+                > next-task-definition.json
+            fi
 
             NEW_TASK_DEFINITION="$(
               aws ecs register-task-definition \
@@ -261,7 +310,7 @@ jobs:
               --force-new-deployment \
               > /dev/null
 
-            echo "Deployed ${SERVICE}"
+            echo "Deployed ${SERVICE}: ${NEW_TASK_DEFINITION}"
           }
 
           deploy_service user-service
